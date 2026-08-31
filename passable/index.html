@@ -1,0 +1,962 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+
+<!-- The name lives here and in the NAME constant at the top of the script.
+     Everything else the player reads is built from that constant. The one
+     exception is the wordmark itself, which is written in the markup because
+     it carries the mark: the second 's' sits at exactly 4.5:1 against the
+     page — passing for body text, and by nothing at all. -->
+<title>Passable — how far does this pair go?</title>
+<meta name="description" content="Ten colour pairs a day. Judge how far each one carries: nowhere, large text only, or body copy.">
+<meta name="theme-color" content="#eff0f1">
+
+<!-- SOCIAL PREVIEW — crawlers don't run JavaScript, so these have to be
+     absolute and written out in full. Update all three if the game moves. -->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Passable">
+<meta property="og:title" content="Passable">
+<meta property="og:description" content="Ten colour pairs a day. How far does each one carry: nowhere, large text only, or body copy?">
+<meta property="og:url" content="https://eaustine.github.io/passable/">
+<meta property="og:image" content="https://eaustine.github.io/passable/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="The word Passable beside a brown swatch showing text at a 4.51 to 1 contrast ratio.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Passable">
+<meta name="twitter:description" content="Ten colour pairs a day. How far does each one carry?">
+
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="icon" href="favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#eff0f1;
+    --ink:#16181b;
+    --muted:#5c6067;          /* 5.54:1 on paper */
+    --rule:#d3d6d9;
+    --hover:rgba(22,24,27,.06);
+    --btn-hover:#000;
+    --shadow:rgba(22,24,27,.12);
+    --backdrop:rgba(22,24,27,.42);
+    --just:#686e76;          /* 4.51:1 — the second 's' */
+    --wrap:620px;
+    color-scheme:light;
+  }
+
+  /* Both palettes pass the thresholds this game is about. The dark muted is
+     5.89:1 and the light one 5.54:1, close enough that neither theme feels
+     softer than the other. */
+  .dark{
+    --paper:#16181b;
+    --ink:#eff0f1;
+    --muted:#8f959d;          /* 5.89:1 on paper */
+    --rule:#33373d;
+    --hover:rgba(239,240,241,.08);
+    --btn-hover:#fff;
+    --shadow:rgba(0,0,0,.5);
+    --just:#78818c;          /* 4.50:1 */
+    --backdrop:rgba(0,0,0,.6);
+    color-scheme:dark;
+  }
+
+  *{box-sizing:border-box}
+  [hidden]{display:none !important}
+
+  body{
+    margin:0;
+    background:var(--paper);
+    color:var(--ink);
+    font-family:"IBM Plex Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;
+    -webkit-font-smoothing:antialiased;
+    padding-bottom:56px;
+  }
+
+  /* Everything is padded by this except the sample, which runs full bleed. */
+  .wrap{max-width:var(--wrap);margin:0 auto;padding:0 22px}
+
+  header{
+    display:flex;align-items:baseline;justify-content:space-between;gap:12px;
+    padding:22px 0 13px;
+  }
+  .wordmark{font-size:17px;font-weight:600;letter-spacing:-.01em;margin:0}
+  /* The pair, sitting in the middle of the word. */
+  .wordmark .just{color:var(--just)}
+  .meta{
+    display:flex;align-items:baseline;flex-wrap:wrap;justify-content:flex-end;
+    gap:5px 15px;font-size:13px;color:var(--muted);
+  }
+  .mode{
+    appearance:none;background:none;border:0;padding:0;font:inherit;font-size:13px;
+    color:var(--ink);text-decoration:underline;text-underline-offset:3px;
+    text-decoration-color:var(--rule);cursor:pointer;
+  }
+  .mode:hover{text-decoration-color:var(--ink)}
+  .mode:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
+
+  /* ---------- the pair, edge to edge ---------- */
+  .sample{padding:38px 0 42px;border-top:1px solid var(--ink)}
+  .sample .lg{font-size:24px;font-weight:600;line-height:1.25;margin:0 0 14px}
+  .sample .sm{font-size:16px;font-weight:400;line-height:1.55;margin:0;max-width:46ch}
+
+  /* A segmented rule rather than dots: it reads as a measuring strip. */
+  .progress{display:grid;grid-template-columns:repeat(10,1fr);gap:2px;height:6px}
+  .progress span{background:var(--rule)}
+  .progress span.hit{background:var(--ink)}
+  .progress span.near{background:var(--muted)}
+  .progress span.miss{background:var(--rule);box-shadow:inset 0 0 0 1px var(--muted)}
+  .progress span.now{background:repeating-linear-gradient(90deg,var(--muted) 0 2px,transparent 2px 4px)}
+
+  /* ---------- asking ---------- */
+  .ask{
+    margin:30px 0 14px;font-size:13px;font-weight:500;color:var(--muted);
+    text-transform:none;
+  }
+  .answers{display:grid;grid-template-columns:repeat(3,1fr);gap:0}
+  .answers button{
+    appearance:none;font:inherit;font-size:14px;font-weight:500;text-align:left;
+    padding:15px 14px 16px;border:1px solid var(--ink);border-left-width:0;
+    background:transparent;color:var(--ink);cursor:pointer;line-height:1.3;
+  }
+  .answers button:first-child{border-left-width:1px}
+  .answers button:hover:not([disabled]){background:var(--hover)}
+  .answers button:focus-visible{outline:2px solid var(--ink);outline-offset:2px;position:relative}
+  .answers button[disabled]{cursor:default;border-color:var(--rule);color:var(--muted)}
+  .answers button[disabled]:first-child{border-left-color:var(--rule)}
+  .answers button.truth{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+  .answers button.yours{box-shadow:inset 0 0 0 2px var(--ink)}
+  .answers button.truth.yours{box-shadow:inset 0 0 0 2px var(--paper)}
+  .kb{
+    display:block;font-family:"IBM Plex Mono",monospace;font-size:11px;
+    color:var(--muted);margin-bottom:5px;
+  }
+  .answers button.truth .kb{color:var(--paper)}
+
+  /* ---------- verdict ---------- */
+  .result{margin-top:28px}
+  .call{font-size:17px;font-weight:600;margin:0 0 6px;letter-spacing:-.01em}
+  .call.wrong{color:var(--muted)}
+  .ratio{
+    margin:0 0 24px;font-family:"IBM Plex Mono",monospace;font-size:14px;color:var(--muted);
+  }
+  .ratio b{color:var(--ink);font-weight:500}
+
+  /* The measuring device: a log axis with both thresholds cut into it. */
+  .scale{margin:0 0 26px}
+  .track{position:relative;height:34px}
+  .track .rail{position:absolute;top:16px;left:0;right:0;height:1px;background:var(--ink)}
+  .track .tick{position:absolute;top:8px;width:1px;height:17px;background:var(--ink)}
+  .track .marker{position:absolute;top:2px;width:2px;height:29px;background:var(--ink)}
+  .track .marker::after{
+    content:"";position:absolute;top:-5px;left:-3px;width:8px;height:8px;background:var(--ink);
+  }
+  .scale-key{
+    position:relative;height:16px;font-family:"IBM Plex Mono",monospace;
+    font-size:11px;color:var(--muted);
+  }
+  .scale-key span{position:absolute;transform:translateX(-50%);white-space:nowrap}
+
+  /* ---------- buttons ---------- */
+  .btn{
+    appearance:none;font:inherit;font-weight:500;font-size:15px;
+    padding:13px 22px;border:1px solid var(--ink);
+    background:var(--ink);color:var(--paper);cursor:pointer;
+  }
+  .btn:hover{background:var(--btn-hover);border-color:var(--btn-hover)}
+  .btn:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
+  .btn.ghost{background:transparent;color:var(--ink)}
+  .btn.ghost:hover{background:var(--hover)}
+
+  /* ---------- set summary ---------- */
+  .summary{margin-top:30px}
+  .summary h2{margin:0 0 8px;font-size:26px;font-weight:600;letter-spacing:-.02em}
+  .summary p{margin:0 0 22px;font-size:15px;line-height:1.55;color:var(--muted);max-width:46ch}
+  .summary .buttons{display:flex;gap:10px;flex-wrap:wrap}
+
+  /* ---------- dialogs ---------- */
+  dialog{
+    position:relative;border:1px solid var(--ink);border-radius:0;
+    background:var(--paper);color:var(--ink);padding:28px 26px 26px;
+    width:calc(100% - 36px);max-width:430px;box-shadow:14px 14px 0 var(--shadow);
+  }
+  dialog::backdrop{background:var(--backdrop)}
+  dialog .close{
+    position:absolute;top:18px;right:18px;width:28px;height:28px;
+    display:grid;place-items:center;padding:0;
+    border:1px solid var(--rule);background:transparent;color:var(--muted);cursor:pointer;
+  }
+  dialog .close:hover{color:var(--ink);border-color:var(--ink)}
+  dialog .close:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+  dialog .close svg{width:12px;height:12px;display:block}
+  dialog h2{margin:0 0 16px;padding-right:38px;font-size:20px;font-weight:600;letter-spacing:-.02em}
+  dialog p{margin:0 0 14px;font-size:14.5px;line-height:1.6;max-width:46ch}
+
+  .rule{list-style:none;margin:0 0 18px;padding:0;display:grid;gap:0}
+  .rule li{
+    display:grid;grid-template-columns:96px 1fr;gap:14px;align-items:baseline;
+    padding:11px 0;border-top:1px solid var(--rule);
+  }
+  .rule li:last-child{border-bottom:1px solid var(--rule)}
+  .rule .lvl{font-size:13px;font-weight:600}
+  .rule p{margin:0;font-size:13.5px;line-height:1.45;color:var(--muted)}
+
+  /* ---------- record ---------- */
+  .tallies{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:0 0 26px}
+  .tallies div{display:grid;gap:3px}
+  .tallies .v{font-size:30px;font-weight:600;letter-spacing:-.03em;line-height:1}
+  .tallies .k{font-size:12px;color:var(--muted);line-height:1.3}
+  .stat-label{
+    margin:24px 0 12px;font-size:11px;font-weight:500;color:var(--muted);
+    font-family:"IBM Plex Mono",monospace;
+  }
+  .stat-note{margin:18px 0 22px;font-size:13px;line-height:1.55;color:var(--muted);max-width:42ch}
+  .stat-empty{margin:0 0 22px;font-size:14.5px;line-height:1.6;color:var(--muted)}
+  .dist{display:grid;gap:1px}
+  .dist .bar{display:grid;grid-template-columns:110px 1fr;gap:12px;align-items:center}
+  .dist .bar .t{font-size:12.5px;color:var(--muted)}
+  .dist .bar .fill{
+    height:20px;min-width:24px;background:var(--rule);
+    display:flex;align-items:center;justify-content:flex-end;padding-right:7px;
+    font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--muted);
+  }
+  .dist .bar .fill.on{background:var(--ink);color:var(--paper)}
+
+  .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+  @media (prefers-reduced-motion:reduce){*{animation:none !important;transition:none !important}}
+
+  @media (max-width:460px){
+    .answers{grid-template-columns:1fr}
+    .answers button{border-left-width:1px;border-top-width:0}
+    .answers button:first-child{border-top-width:1px}
+    .sample{padding:30px 0 34px}
+    .summary h2{font-size:22px}
+  }
+</style>
+<script>
+/* Runs before anything renders, so the page never paints the wrong theme and
+   then corrects itself. Kept apart from the main storage adapter on purpose:
+   that one is async, and this has to be synchronous. */
+(function () {
+  try {
+    var saved = window.localStorage.getItem('passable:theme');
+    var dark = saved ? saved === 'dark'
+      : window.matchMedia('(prefers-color-scheme: dark)').matches;
+    if (dark) document.documentElement.classList.add('dark');
+  } catch (e) {
+    if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+      document.documentElement.classList.add('dark');
+    }
+  }
+})();
+</script>
+</head>
+<body>
+<main class="app">
+
+  <div class="wrap">
+    <header>
+      <h1 class="wordmark" id="wordmark">Pas<span class="just">s</span>able</h1>
+      <div class="meta">
+        <span id="puzzleNo">No. 1</span>
+        <button class="mode" id="themeBtn" type="button" aria-pressed="false">Dark</button>
+        <button class="mode" id="statsBtn" type="button">Stats</button>
+        <button class="mode" id="helpBtn" type="button">How to play</button>
+      </div>
+    </header>
+  </div>
+
+  <div id="game">
+    <div class="sample" id="sample">
+      <div class="wrap">
+        <p class="lg" id="sampleLg">Large text at 24px</p>
+        <p class="sm" id="sampleSm">Body copy at 16px, the size most interface text actually uses.</p>
+      </div>
+    </div>
+
+    <div class="progress" id="progress" aria-label="Progress through this set"></div>
+
+    <div class="wrap">
+      <p class="ask" id="ask">How far does this pair carry?</p>
+
+      <div class="answers" id="answers">
+        <button type="button" data-level="0"><span class="kb">1</span>Nowhere</button>
+        <button type="button" data-level="1"><span class="kb">2</span>Large only</button>
+        <button type="button" data-level="2"><span class="kb">3</span>Body copy</button>
+      </div>
+
+      <div class="result" id="result" hidden>
+        <p class="call" id="call"></p>
+        <p class="ratio" id="ratioLine"></p>
+
+        <div class="scale">
+          <div class="track">
+            <span class="rail"></span>
+            <span class="tick" id="tick3"></span>
+            <span class="tick" id="tick45"></span>
+            <span class="marker" id="marker"></span>
+          </div>
+          <div class="scale-key">
+            <span id="key3">3:1</span>
+            <span id="key45">4.5:1</span>
+          </div>
+        </div>
+
+        <button class="btn" id="nextBtn" type="button">Next pair</button>
+      </div>
+
+      <div class="summary" id="summary" hidden>
+        <h2 id="summaryTitle"></h2>
+        <p id="summaryText"></p>
+        <div class="buttons">
+          <button class="btn" id="againBtn" type="button">Next ten</button>
+          <button class="btn ghost" id="summaryStats" type="button">See your record</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <p class="sr" role="status" aria-live="polite" id="live"></p>
+
+  <dialog id="help" aria-labelledby="helpTitle">
+    <button class="close" id="helpX" type="button" aria-label="Close instructions">
+      <svg viewBox="0 0 14 14" aria-hidden="true" focusable="false">
+        <path d="M1 1 L13 13 M13 1 L1 13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+      </svg>
+    </button>
+
+    <h2 id="helpTitle">How to play</h2>
+
+    <p>Ten colour pairs. For each one, say how far it carries.</p>
+
+    <ul class="rule">
+      <li><span class="lvl">Body copy</span><p>4.5:1 or better. Safe at any size.</p></li>
+      <li><span class="lvl">Large only</span><p>3:1 to 4.5:1. Fine at 24px, or 19px bold. Not for body text.</p></li>
+      <li><span class="lvl">Nowhere</span><p>Under 3:1. Fails even for large text and interface parts.</p></li>
+    </ul>
+
+    <p>Those three numbers are the WCAG AA thresholds. Most pairs you'll see sit
+    near a boundary, because that's where the judgement is actually hard.</p>
+
+    <p>Contrast is a luminance calculation, so hue barely moves it. Two colours
+    can look completely different and still fail.</p>
+
+    <p>Switch the theme mid-set and watch a pair you have already judged. It
+    will look different against a dark page than a light one. The ratio has
+    not moved at all — your eyes have. That gap is the reason the number
+    exists.</p>
+
+    <button class="btn" id="helpClose" type="button">Start</button>
+  </dialog>
+
+  <dialog id="stats" aria-labelledby="statsTitle">
+    <button class="close" id="statsX" type="button" aria-label="Close your record">
+      <svg viewBox="0 0 14 14" aria-hidden="true" focusable="false">
+        <path d="M1 1 L13 13 M13 1 L1 13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+      </svg>
+    </button>
+
+    <h2 id="statsTitle">Your record</h2>
+    <p class="stat-empty" id="statsEmpty" hidden>Nothing here yet. Answer a few pairs and this fills in.</p>
+
+    <div id="statsBody">
+      <div class="tallies" id="tallies"></div>
+      <h3 class="stat-label">Where you land when you're wrong</h3>
+      <div class="dist" id="lean"></div>
+      <p class="stat-note" id="statsNote"></p>
+    </div>
+
+    <button class="btn" id="statsClose" type="button">Back to the game</button>
+  </dialog>
+</main>
+
+<script>
+(function () {
+  'use strict';
+
+  /* Working title. Every string the player reads is built from this, so the
+     rename is this line plus the meta block in the head. */
+  var NAME = 'Passable';
+
+  var PER_SET = 10;
+  var LAUNCH = Date.UTC(2026, 7, 31);
+  var LEVELS = ['Nowhere', 'Large text only', 'Body copy'];
+
+  /* ---------- storage ----------
+     Same three-tier adapter as Hueristic: the host's storage if there is one,
+     localStorage on a real domain, memory if both are blocked. Keys are
+     namespaced per project so a sibling game can't read this one's save. */
+  var Store = (function () {
+    var KEY = 'passable:v1';
+
+    var host = (window.storage && typeof window.storage.get === 'function') ? window.storage : null;
+    if (host) {
+      return {
+        load: function () {
+          return host.get(KEY).then(function (r) {
+            return r && r.value ? JSON.parse(r.value) : null;
+          })['catch'](function () { return null; });
+        },
+        save: function (d) { return host.set(KEY, JSON.stringify(d))['catch'](function () {}); }
+      };
+    }
+
+    var local = null;
+    try {
+      window.localStorage.setItem('__passable__', '1');
+      window.localStorage.removeItem('__passable__');
+      local = window.localStorage;
+    } catch (e) { local = null; }
+
+    if (local) {
+      return {
+        load: function () {
+          var out = null;
+          try { var raw = local.getItem(KEY); if (raw) out = JSON.parse(raw); } catch (e) { out = null; }
+          return Promise.resolve(out);
+        },
+        save: function (d) {
+          try { local.setItem(KEY, JSON.stringify(d)); } catch (e) {}
+          return Promise.resolve();
+        }
+      };
+    }
+
+    var mem = null;
+    return {
+      load: function () { return Promise.resolve(mem); },
+      save: function (d) { mem = d; return Promise.resolve(); }
+    };
+  })();
+
+  /* ---------- colour ---------- */
+
+  function hslToRgb(h, s, l) {
+    s /= 100; l /= 100;
+    var k = function (n) { return (n + h / 30) % 12; };
+    var a = s * Math.min(l, 1 - l);
+    var f = function (n) {
+      return l - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)));
+    };
+    return [Math.round(f(0) * 255), Math.round(f(8) * 255), Math.round(f(4) * 255)];
+  }
+
+  function hex(rgb) {
+    return '#' + rgb.map(function (v) { return v.toString(16).padStart(2, '0'); }).join('');
+  }
+
+  // WCAG relative luminance. The channel weights are why hue barely matters
+  // and green dominates.
+  function luminance(rgb) {
+    var c = rgb.map(function (v) {
+      v /= 255;
+      return v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+    });
+    return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+  }
+
+  function contrast(a, b) {
+    var la = luminance(a), lb = luminance(b);
+    var hi = Math.max(la, lb), lo = Math.min(la, lb);
+    return (hi + 0.05) / (lo + 0.05);
+  }
+
+  function band(ratio) {
+    return ratio >= 4.5 ? 2 : (ratio >= 3 ? 1 : 0);
+  }
+
+  // Luminance rises monotonically with HSL lightness at a fixed hue and
+  // saturation, so a bisection always lands.
+  function colourAtLuminance(h, s, target) {
+    var lo = 0, hi = 100, mid, rgb;
+    for (var i = 0; i < 22; i++) {
+      mid = (lo + hi) / 2;
+      rgb = hslToRgb(h, s, mid);
+      if (luminance(rgb) < target) lo = mid; else hi = mid;
+    }
+    return hslToRgb(h, s, (lo + hi) / 2);
+  }
+
+  /* ---------- the set ----------
+     Random pairs are mostly boring: near-black on near-white, or two mid-greys
+     that obviously fail. The judgement only gets hard near the thresholds, so
+     the generator aims at them and keeps a few easy pairs as breathers. */
+
+  function mulberry32(a) {
+    return function () {
+      a |= 0; a = a + 0x6D2B79F5 | 0;
+      var t = Math.imul(a ^ a >>> 15, 1 | a);
+      t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+      return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    };
+  }
+
+  // A target sitting exactly on a threshold can never satisfy the guard below,
+  // so the retry loop would spin out and fall through. Push it clear first.
+  function nudge(target) {
+    var edges = [3, 4.5], i, gap = 0.12;
+    for (i = 0; i < edges.length; i++) {
+      var d = target - edges[i];
+      if (Math.abs(d) < gap) return edges[i] + (d < 0 ? -gap : gap);
+    }
+    return target;
+  }
+
+  function makePair(rand, wanted) {
+    var target = nudge(wanted);
+    for (var attempt = 0; attempt < 60; attempt++) {
+      var bg = hslToRgb(
+        Math.floor(rand() * 360),
+        8 + Math.floor(rand() * 66),
+        12 + Math.floor(rand() * 76)
+      );
+      var lb = luminance(bg);
+
+      // Put the text on whichever side of the background has room for the ratio.
+      var wantLighter = lb < 0.2;
+      var lf = wantLighter ? target * (lb + 0.05) - 0.05 : (lb + 0.05) / target - 0.05;
+      if (lf < 0 || lf > 1) {
+        wantLighter = !wantLighter;
+        lf = wantLighter ? target * (lb + 0.05) - 0.05 : (lb + 0.05) / target - 0.05;
+      }
+      if (lf < 0 || lf > 1) continue;
+
+      var fg = colourAtLuminance(Math.floor(rand() * 360), Math.floor(rand() * 55), lf);
+      var got = contrast(bg, fg);
+
+      // Rounding to 8 bits moves the ratio slightly. A pair that lands within a
+      // hair of a threshold is a coin toss rather than a judgement, so drop it.
+      if (Math.abs(got - 3) < 0.06 || Math.abs(got - 4.5) < 0.06) continue;
+      if (Math.abs(got - target) > 0.35) continue;
+
+      return { bg: bg, fg: fg, ratio: got };
+    }
+    // Fallback that can always be built: grey on grey. The ratio is measured
+    // from the colours rather than assumed, so what the player is told always
+    // matches what the player is shown.
+    var g = colourAtLuminance(0, 0, 0.5);
+    var f = colourAtLuminance(0, 0, (luminance(g) + 0.05) / target - 0.05);
+    return { bg: g, fg: f, ratio: contrast(g, f) };
+  }
+
+  function buildSet(day, round) {
+    var rand = mulberry32((day * 2654435761 + round * 40503) % 2147483647);
+    rand(); rand();
+
+    var targets = [], i;
+    for (i = 0; i < 3; i++) targets.push(2.40 + rand() * 1.15);   // either side of 3:1
+    for (i = 0; i < 3; i++) targets.push(3.95 + rand() * 1.10);   // either side of 4.5:1
+    for (i = 0; i < 2; i++) targets.push(1.35 + rand() * 0.95);   // clearly not enough
+    for (i = 0; i < 2; i++) targets.push(5.80 + rand() * 6.50);   // clearly fine
+
+    for (i = targets.length - 1; i > 0; i--) {         // Fisher-Yates
+      var j = Math.floor(rand() * (i + 1));
+      var t = targets[i]; targets[i] = targets[j]; targets[j] = t;
+    }
+
+    return targets.map(function (t) { return makePair(rand, t); });
+  }
+
+  /* ---------- state ---------- */
+
+  var el = {
+    wordmark: document.getElementById('wordmark'),
+    puzzleNo: document.getElementById('puzzleNo'),
+    progress: document.getElementById('progress'),
+    sample: document.getElementById('sample'),
+    sampleLg: document.getElementById('sampleLg'),
+    sampleSm: document.getElementById('sampleSm'),
+    ask: document.getElementById('ask'),
+    answers: document.getElementById('answers'),
+    result: document.getElementById('result'),
+    call: document.getElementById('call'),
+    ratioLine: document.getElementById('ratioLine'),
+    tick3: document.getElementById('tick3'),
+    tick45: document.getElementById('tick45'),
+    key3: document.getElementById('key3'),
+    key45: document.getElementById('key45'),
+    marker: document.getElementById('marker'),
+    next: document.getElementById('nextBtn'),
+    summary: document.getElementById('summary'),
+    summaryTitle: document.getElementById('summaryTitle'),
+    summaryText: document.getElementById('summaryText'),
+    again: document.getElementById('againBtn'),
+    summaryStats: document.getElementById('summaryStats'),
+    live: document.getElementById('live'),
+    help: document.getElementById('help'),
+    helpBtn: document.getElementById('helpBtn'),
+    helpClose: document.getElementById('helpClose'),
+    helpX: document.getElementById('helpX'),
+    stats: document.getElementById('stats'),
+    statsBtn: document.getElementById('statsBtn'),
+    themeBtn: document.getElementById('themeBtn'),
+    statsClose: document.getElementById('statsClose'),
+    statsX: document.getElementById('statsX'),
+    statsBody: document.getElementById('statsBody'),
+    statsEmpty: document.getElementById('statsEmpty'),
+    tallies: document.getElementById('tallies'),
+    lean: document.getElementById('lean'),
+    statsNote: document.getElementById('statsNote')
+  };
+
+  var state = {
+    day: 0,
+    round: 1,
+    set: [],
+    at: 0,
+    answers: [],      // the level the player picked, per pair
+    seenHelp: false,
+    // Survives the daily reset. lean[d] counts answers d-1 steps from the truth,
+    // so index 0 is "two too harsh" and index 4 is "two too generous".
+    record: { asked: 0, right: 0, lean: [0, 0, 0, 0, 0], sets: 0, days: 0, lastDay: -1 }
+  };
+
+  function persist() {
+    Store.save({
+      v: 1,
+      day: state.day,
+      round: state.round,
+      at: state.at,
+      answers: state.answers,
+      seenHelp: state.seenHelp,
+      record: state.record
+    });
+  }
+
+  function dayIndex() {
+    var n = new Date();
+    return Math.floor((Date.UTC(n.getFullYear(), n.getMonth(), n.getDate()) - LAUNCH) / 86400000);
+  }
+
+  /* ---------- rendering ---------- */
+
+  // A log scale, because everything interesting happens between 1 and 5 and a
+  // linear axis would squash it against the left edge.
+  var SCALE_MAX = 21;
+  function scalePos(ratio) {
+    var r = Math.max(1, Math.min(SCALE_MAX, ratio));
+    return Math.log(r) / Math.log(SCALE_MAX) * 100;
+  }
+
+  function paintProgress() {
+    el.progress.innerHTML = '';
+    for (var i = 0; i < PER_SET; i++) {
+      var cell = document.createElement('span');
+      if (i < state.answers.length) {
+        var gap = Math.abs(state.answers[i] - band(state.set[i].ratio));
+        cell.className = gap === 0 ? 'hit' : (gap === 1 ? 'near' : 'miss');
+      } else if (i === state.at) {
+        cell.className = 'now';
+      }
+      el.progress.appendChild(cell);
+    }
+  }
+
+  function showPair() {
+    var pair = state.set[state.at];
+    el.sample.style.background = hex(pair.bg);
+    el.sampleLg.style.color = hex(pair.fg);
+    el.sampleSm.style.color = hex(pair.fg);
+
+    el.result.hidden = true;
+    el.summary.hidden = true;
+    el.answers.hidden = false;
+    el.ask.hidden = false;
+    el.ask.textContent = 'Pair ' + (state.at + 1) + ' of ' + PER_SET +
+                         ' — how far does it carry?';
+
+    [].forEach.call(el.answers.children, function (b) {
+      b.disabled = false;
+      b.className = '';
+    });
+    paintProgress();
+  }
+
+  function reveal(picked) {
+    var pair = state.set[state.at];
+    var truth = band(pair.ratio);
+    var right = picked === truth;
+
+    [].forEach.call(el.answers.children, function (b) {
+      b.disabled = true;
+      var lvl = +b.getAttribute('data-level');
+      if (lvl === truth) b.classList.add('truth');
+      if (lvl === picked) b.classList.add('yours');
+    });
+
+    el.call.className = 'call' + (right ? '' : ' wrong');
+    el.call.textContent = right ? 'Right.'
+      : (picked > truth ? 'Too generous.' : 'Too harsh.');
+
+    el.ratioLine.innerHTML = '<b>' + pair.ratio.toFixed(2) + ' : 1</b> — ' +
+      LEVELS[truth].toLowerCase() + '.';
+
+    el.tick3.style.left = scalePos(3) + '%';
+    el.tick45.style.left = scalePos(4.5) + '%';
+    el.key3.style.left = scalePos(3) + '%';
+    el.key45.style.left = scalePos(4.5) + '%';
+    el.marker.style.left = scalePos(pair.ratio) + '%';
+
+    el.live.textContent = (right ? 'Correct. ' : 'Not quite. ') +
+      pair.ratio.toFixed(2) + ' to 1, ' + LEVELS[truth].toLowerCase() + '.';
+
+    el.ask.hidden = true;
+    el.result.hidden = false;
+    el.next.textContent = state.at + 1 === PER_SET ? 'See the set' : 'Next pair';
+    el.next.focus();
+  }
+
+  function answer(picked) {
+    if (state.answers.length > state.at) return;
+
+    var truth = band(state.set[state.at].ratio);
+    state.answers.push(picked);
+
+    state.record.asked += 1;
+    if (picked === truth) state.record.right += 1;
+    state.record.lean[picked - truth + 2] += 1;
+
+    paintProgress();
+    reveal(picked);
+    persist();
+  }
+
+  function finishSet() {
+    var right = 0;
+    state.answers.forEach(function (a, i) {
+      if (a === band(state.set[i].ratio)) right += 1;
+    });
+
+    state.record.sets += 1;
+
+    el.answers.hidden = true;
+    el.ask.hidden = true;
+    el.result.hidden = true;
+    el.summary.hidden = false;
+
+    el.summaryTitle.textContent = right + ' of ' + PER_SET + ' right';
+    el.summaryText.textContent = right === PER_SET
+      ? 'A clean set. The near-threshold pairs are the ones worth being smug about.'
+      : (right >= 7
+          ? 'Solid. Check your record to see which way you lean when you miss.'
+          : 'Worth another ten. The pairs cluster near the thresholds on purpose.');
+
+    persist();
+  }
+
+  function next() {
+    if (state.at + 1 >= PER_SET) { finishSet(); return; }
+    state.at += 1;
+    showPair();
+    persist();
+  }
+
+  function startRound() {
+    state.set = buildSet(state.day, state.round);
+    state.at = 0;
+    state.answers = [];
+    showPair();
+  }
+
+  function nextRound() {
+    state.round += 1;
+    startRound();
+    persist();
+  }
+
+  /* ---------- stats ---------- */
+
+  var LEAN_LABEL = ['Two too harsh', 'One too harsh', 'Right', 'One too generous', 'Two too generous'];
+
+  function renderStats() {
+    var r = state.record;
+    el.statsEmpty.hidden = r.asked > 0;
+    el.statsBody.hidden = r.asked === 0;
+    if (!r.asked) return;
+
+    var pct = Math.round(r.right / r.asked * 100);
+    el.tallies.innerHTML = '';
+    [['Pairs', r.asked], ['Right', r.right], ['Accuracy', pct + '%']].forEach(function (pair) {
+      var box = document.createElement('div');
+      var v = document.createElement('span'); v.className = 'v'; v.textContent = pair[1];
+      var k = document.createElement('span'); k.className = 'k'; k.textContent = pair[0];
+      box.appendChild(v); box.appendChild(k);
+      el.tallies.appendChild(box);
+    });
+
+    var peak = Math.max.apply(null, r.lean.concat([1]));
+    el.lean.innerHTML = '';
+    r.lean.forEach(function (count, i) {
+      var row = document.createElement('div');
+      row.className = 'bar';
+      var t = document.createElement('span'); t.className = 't'; t.textContent = LEAN_LABEL[i];
+      var fill = document.createElement('span');
+      fill.className = 'fill' + (count ? ' on' : '');
+      fill.style.width = Math.round(count / peak * 100) + '%';
+      fill.textContent = count;
+      row.appendChild(t); row.appendChild(fill);
+      el.lean.appendChild(row);
+    });
+
+    // The direction of the error matters more than the size of it. Calling a
+    // failing pair usable is the mistake that reaches production.
+    var generous = r.lean[3] + r.lean[4];
+    var harsh = r.lean[0] + r.lean[1];
+    var wrong = generous + harsh;
+    var notes = [];
+
+    if (wrong >= 5) {
+      if (generous >= wrong * 0.65) {
+        notes.push('You lean generous. ' + Math.round(generous / wrong * 100) +
+                   '% of your misses rate a pair better than it is, which is the ' +
+                   'direction that ships.');
+      } else if (harsh >= wrong * 0.65) {
+        notes.push('You lean harsh. ' + Math.round(harsh / wrong * 100) +
+                   '% of your misses reject a pair that was fine.');
+      } else {
+        notes.push('Your misses fall about evenly either side of the line.');
+      }
+    }
+    if (r.sets > 0) notes.push('Sets finished: ' + r.sets + '.');
+    if (r.days > 1) notes.push('Played on ' + r.days + ' days.');
+
+    el.statsNote.textContent = notes.join(' ');
+  }
+
+  /* ---------- dialogs ---------- */
+
+  function openHelp() {
+    if (typeof el.help.showModal === 'function') el.help.showModal();
+    else el.help.setAttribute('open', '');
+  }
+  function closeHelp() {
+    if (typeof el.help.close === 'function') el.help.close();
+    else el.help.removeAttribute('open');
+    if (!state.seenHelp) { state.seenHelp = true; persist(); }
+  }
+  function openStats() {
+    renderStats();
+    if (typeof el.stats.showModal === 'function') el.stats.showModal();
+    else el.stats.setAttribute('open', '');
+  }
+  function closeStats() {
+    if (typeof el.stats.close === 'function') el.stats.close();
+    else el.stats.removeAttribute('open');
+  }
+
+  /* ---------- boot ---------- */
+
+  /* ---------- theme ----------
+     The pre-paint script in the head has already picked one; this reads that
+     back rather than deciding again, so the two can't disagree. The choice
+     lives in its own key because it must be readable synchronously, which the
+     main adapter is not. */
+  function darkNow() {
+    return document.documentElement.classList.contains('dark');
+  }
+
+  function applyTheme(dark, remember) {
+    document.documentElement.classList.toggle('dark', dark);
+    el.themeBtn.textContent = dark ? 'Light' : 'Dark';
+    el.themeBtn.setAttribute('aria-pressed', dark ? 'true' : 'false');
+
+    var meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute('content', dark ? '#16181b' : '#eff0f1');
+
+    if (remember) {
+      try { window.localStorage.setItem('passable:theme', dark ? 'dark' : 'light'); }
+      catch (e) { /* blocked: the toggle still works for this session */ }
+    }
+  }
+
+  function startDay(saved) {
+    state.day = dayIndex();
+    state.seenHelp = !!(saved && saved.seenHelp);
+    el.puzzleNo.textContent = 'No. ' + (state.day + 1);
+    document.title = NAME + ' — how far does this pair go?';
+
+    if (saved && saved.record) {
+      var r = saved.record;
+      state.record = {
+        asked: r.asked || 0,
+        right: r.right || 0,
+        lean: (r.lean && r.lean.length === 5) ? r.lean.slice() : [0, 0, 0, 0, 0],
+        sets: r.sets || 0,
+        days: r.days || 0,
+        lastDay: typeof r.lastDay === 'number' ? r.lastDay : -1
+      };
+    }
+    if (state.record.lastDay !== state.day) {
+      state.record.days += 1;
+      state.record.lastDay = state.day;
+    }
+
+    var sameDay = saved && saved.day === state.day;
+    state.round = sameDay ? (saved.round || 1) : 1;
+    startRound();
+
+    // Replay the answers already given today so a refresh doesn't hand back a
+    // free run at pairs that have been seen.
+    if (sameDay && saved.answers && saved.answers.length) {
+      state.answers = saved.answers.slice(0, PER_SET);
+      state.at = Math.min(saved.at || 0, PER_SET - 1);
+      if (state.answers.length >= PER_SET) {
+        paintProgress();
+        finishSet();
+      } else {
+        state.at = state.answers.length;
+        showPair();
+      }
+    }
+    persist();
+  }
+
+  [].forEach.call(el.answers.children, function (b) {
+    b.addEventListener('click', function () { answer(+b.getAttribute('data-level')); });
+  });
+  el.next.addEventListener('click', next);
+  el.again.addEventListener('click', nextRound);
+  el.summaryStats.addEventListener('click', openStats);
+
+  el.helpBtn.addEventListener('click', openHelp);
+  el.helpClose.addEventListener('click', closeHelp);
+  el.helpX.addEventListener('click', closeHelp);
+  el.themeBtn.addEventListener('click', function () { applyTheme(!darkNow(), true); });
+  el.statsBtn.addEventListener('click', openStats);
+  el.statsClose.addEventListener('click', closeStats);
+  el.statsX.addEventListener('click', closeStats);
+
+  document.addEventListener('keydown', function (e) {
+    if (el.help.open || el.stats.open) return;
+    if (e.key === '1' || e.key === '2' || e.key === '3') {
+      if (!el.answers.hidden) { e.preventDefault(); answer(+e.key - 1); }
+    } else if (e.key === 'Enter' && !el.result.hidden) {
+      e.preventDefault(); next();
+    }
+  });
+
+  applyTheme(darkNow(), false);
+
+  // If they have never picked, keep following the system when it changes.
+  if (window.matchMedia) {
+    var chosen = false;
+    try { chosen = !!window.localStorage.getItem('passable:theme'); } catch (e) {}
+    if (!chosen) {
+      var mq = window.matchMedia('(prefers-color-scheme: dark)');
+      var follow = function (e) { applyTheme(e.matches, false); };
+      if (mq.addEventListener) mq.addEventListener('change', follow);
+      else if (mq.addListener) mq.addListener(follow);
+    }
+  }
+
+  Store.load().then(function (saved) {
+    startDay(saved);
+    if (!state.seenHelp) openHelp();
+  });
+})();
+</script>
+</body>
+</html>
