@@ -403,6 +403,16 @@
 
   /* ---------- shared result ---------- */
   .shared{margin-top:var(--gap)}
+  /* width and height attributes are on the tag too, so the page doesn't jump
+     when the image arrives. */
+  .shared .hero{
+    display:block;
+    width:100%;
+    height:auto;
+    margin:0 0 22px;
+    border-radius:2px;
+    box-shadow:var(--shadow);
+  }
   .shared h2{
     margin:0 0 7px;
     font-size:19px;
@@ -534,11 +544,13 @@
   </div><!-- /#game -->
 
   <section class="shared" id="shared" hidden>
+    <img class="hero" src="og.png" width="1200" height="630"
+         alt="A blue swatch above a hue slider, beside the word Colordle.">
+
     <h2 id="sharedTitle"></h2>
     <p id="sharedNote"></p>
     <p class="pitch">Each round hides a color. You get six tries to match it,
-    using a hue, a saturation and a lightness slider. Every try tells you how
-    close each of the three is.</p>
+    using a hue, a saturation and a lightness slider.</p>
 
     <div class="key">
       <span><span class="cell lock"></span>matched</span>
@@ -1090,11 +1102,6 @@
     var today = dayIndex();
     var wins = 0;
 
-    el.sharedTitle.textContent = 'No. ' + (data.day + 1);
-    el.sharedNote.textContent = data.day === today
-      ? 'Someone shared their Colordle rounds from today. The same colors are waiting for you.'
-      : 'Someone shared their Colordle rounds from an earlier day. Today\'s puzzle is No. ' + (today + 1) + '.';
-
     el.sharedResults.innerHTML = '';
 
     data.rounds.forEach(function (guesses, i) {
@@ -1144,6 +1151,23 @@
       block.appendChild(grid);
       el.sharedResults.appendChild(block);
     });
+
+    // The headline is the outcome, not the puzzle number. Someone arriving
+    // from a link has never played; "No. 1" means nothing to them, while
+    // "Matched in four tries" is a fact worth reacting to.
+    var total = data.rounds.length;
+    if (total === 1) {
+      var tries = data.rounds[0].length;
+      el.sharedTitle.textContent = wins
+        ? (tries === 1 ? 'Matched on the first try' : 'Matched in ' + tries + ' tries')
+        : 'Missed the color';
+    } else {
+      el.sharedTitle.textContent = wins + ' of ' + total + ' rounds matched';
+    }
+
+    el.sharedNote.textContent = data.day === today
+      ? 'Colordle No. ' + (data.day + 1) + ', shared from today. The same colors are waiting for you.'
+      : 'Colordle No. ' + (data.day + 1) + '. Today\'s puzzle is No. ' + (today + 1) + '.';
 
     el.shared.setAttribute('aria-label',
       wins + ' of ' + data.rounds.length + ' rounds matched');
