@@ -435,6 +435,7 @@
 
   /* ---------- leaderboard ---------- */
   .board-you{margin:0 0 4px;font-size:14px;line-height:1.55;max-width:42ch}
+  .board-who{margin:18px 0 20px;font-size:12.5px;line-height:1.5;color:var(--dim);max-width:42ch}
 
   /* Your own bar is marked by a rule beside it rather than a colour, for the
      same reason the game's feedback carries no colour. */
@@ -453,6 +454,13 @@
   .board-list .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .board-list .score{font-weight:600}
   .board-list .score.miss{color:var(--dim);font-weight:500}
+
+  .verdict-board{
+    margin-top:18px;
+    padding-top:16px;
+    border-top:1px solid var(--edge);
+  }
+  .verdict-board p{margin:0 0 10px;font-size:13px;line-height:1.55;color:var(--dim);max-width:44ch}
 
   .join-row{display:flex;gap:9px;margin-bottom:4px}
   .join-row input{
@@ -597,6 +605,15 @@
       <textarea id="fallbackText" rows="3" readonly
                 aria-label="Your results, ready to copy"></textarea>
     </div>
+
+    <div class="verdict-board" id="verdictBoard" hidden>
+      <p id="verdictBoardText"></p>
+      <div class="join-row" id="verdictJoinRow" hidden>
+        <input id="verdictName" type="text" maxlength="20" autocomplete="nickname"
+               placeholder="Your name">
+        <button class="btn" id="verdictJoinBtn" type="button">Join</button>
+      </div>
+    </div>
   </div>
 
   <ul class="log" id="log" aria-label="Previous guesses"></ul>
@@ -673,6 +690,9 @@
     Everyone gets the same colors in the same order each day, so scores compare.
     The number beside the title is today's puzzle, counting up one a day.</p>
 
+    <p id="helpBoard" hidden>Your first round each day can go on a shared
+    board, so you can see how everyone else got on with the same colors.</p>
+
     <button class="btn" id="helpClose" type="button">Start playing</button>
   </dialog>
 
@@ -735,6 +755,8 @@
       are public and can't be edited afterwards. Only the first round counts —
       later rounds are practice.</p>
     </div>
+
+    <p class="board-who" id="boardWho" hidden></p>
 
     <button class="btn ghost" id="boardClose" type="button">Back to the game</button>
   </dialog>
@@ -875,7 +897,14 @@
     boardList: document.getElementById('boardList'),
     boardJoin: document.getElementById('boardJoin'),
     boardName: document.getElementById('boardName'),
-    boardJoinBtn: document.getElementById('boardJoinBtn')
+    boardJoinBtn: document.getElementById('boardJoinBtn'),
+    boardWho: document.getElementById('boardWho'),
+    helpBoard: document.getElementById('helpBoard'),
+    verdictBoard: document.getElementById('verdictBoard'),
+    verdictBoardText: document.getElementById('verdictBoardText'),
+    verdictJoinRow: document.getElementById('verdictJoinRow'),
+    verdictName: document.getElementById('verdictName'),
+    verdictJoinBtn: document.getElementById('verdictJoinBtn')
   };
 
   function openHelp() {
@@ -1236,8 +1265,8 @@
     // most attempts until one came up lucky.
     if (state.round === 1) {
       state.firstResult = won ? n : 7;
-      postScore();
     }
+    updateVerdictBoard();
 
     state.history.push({
       round: state.round,
@@ -1252,9 +1281,11 @@
   }
 
   function postScore() {
-    if (!boardOn || !state.name || state.posted || !state.firstResult) return;
+    if (!boardOn || !state.name || state.posted || !state.firstResult) {
+      return Promise.resolve(false);
+    }
 
-    fetch(BOARD.url + '/rest/v1/scores', {
+    return fetch(BOARD.url + '/rest/v1/scores', {
       method: 'POST',
       headers: boardHeaders(),
       body: JSON.stringify({
@@ -1269,8 +1300,10 @@
       if (res.ok || res.status === 409) {
         state.posted = true;
         persist();
+        return true;
       }
-    })['catch'](function () { /* offline: the game does not care */ });
+      return false;
+    })['catch'](function () { return false; });
   }
 
   function fetchBoard() {
@@ -1342,7 +1375,16 @@
       el.boardList.appendChild(li);
     });
 
-    el.boardJoin.hidden = !!state.name;
+    var joined = !!state.name;
+    el.boardJoin.hidden = joined;
+    el.boardWho.hidden = !joined;
+    if (joined) {
+      el.boardWho.textContent = state.posted
+        ? 'Playing as ' + state.name + '. Your score is in.'
+        : (state.firstResult
+            ? 'Playing as ' + state.name + '. Your score hasn\'t sent yet — reopen the board to retry.'
+            : 'Playing as ' + state.name + '. Finish today\'s first round to appear here.');
+    }
     el.boardBody.hidden = false;
     el.boardState.hidden = true;
   }
@@ -1350,17 +1392,22 @@
   function openBoard() {
     el.boardBody.hidden = true;
     el.boardJoin.hidden = true;
+    el.boardWho.hidden = true;
     el.boardState.hidden = false;
     el.boardState.textContent = 'Loading today\'s board…';
 
     if (typeof el.board.showModal === 'function') el.board.showModal();
     else el.board.setAttribute('open', '');
 
-    fetchBoard().then(renderBoard)['catch'](function () {
-      el.boardState.textContent =
-        'Couldn\'t reach the board just now. Your rounds are safe either way.';
-      el.boardJoin.hidden = !!state.name;
-    });
+    // Send anything still pending before reading, so a score that failed
+    // earlier gets another chance every time the board is opened.
+    postScore()
+      .then(fetchBoard)
+      .then(renderBoard)['catch'](function () {
+        el.boardState.textContent =
+          'Couldn\'t reach the board just now. Your rounds are safe either way.';
+        el.boardJoin.hidden = !!state.name;
+      });
   }
 
   function closeBoard() {
@@ -1368,17 +1415,77 @@
     else el.board.removeAttribute('open');
   }
 
-  function joinBoard() {
-    var name = el.boardName.value.replace(/\s+/g, ' ').trim().slice(0, 20);
-    if (!name) { el.boardName.focus(); return; }
+  function cleanName(value) {
+    return String(value).replace(/\s+/g, ' ').trim().slice(0, 20);
+  }
+
+  // Shown in the results panel, where the ask actually means something: the
+  // player has a score in front of them and a reason to want it compared.
+  // Asking on first load would put a form in front of someone who has not
+  // played yet and does not know what the board is for.
+  function updateVerdictBoard() {
+    if (!boardOn || !state.firstResult) { el.verdictBoard.hidden = true; return; }
+    // After round one it always reports. Later rounds only nudge if the score
+    // still hasn't gone anywhere.
+    if (state.posted && state.round !== 1) { el.verdictBoard.hidden = true; return; }
+
+    el.verdictBoard.hidden = false;
+
+    if (!state.name) {
+      el.verdictJoinRow.hidden = false;
+      el.verdictBoardText.textContent =
+        'Add a name to put this score on today\'s board. Your first round is the one that counts.';
+      return;
+    }
+
+    el.verdictJoinRow.hidden = true;
+    if (state.posted) {
+      el.verdictBoardText.textContent =
+        'Your score is on today\'s board as ' + state.name + '.';
+      return;
+    }
+
+    el.verdictBoardText.textContent = 'Sending your score to the board…';
+    postScore().then(function (ok) {
+      el.verdictBoardText.textContent = ok
+        ? 'Your score is on today\'s board as ' + state.name + '.'
+        : 'Couldn\'t reach the board. Open Board to try again.';
+    });
+  }
+
+  function joinFromVerdict() {
+    var name = cleanName(el.verdictName.value);
+    if (!name) { el.verdictName.focus(); return; }
     state.name = name;
     persist();
-    postScore();
+    updateVerdictBoard();
+  }
+
+  function joinBoard() {
+    var name = cleanName(el.boardName.value);
+    if (!name) { el.boardName.focus(); return; }
+
+    state.name = name;
+    persist();
+
     el.boardJoin.hidden = true;
-    // Give the insert a moment to land before asking for the board again.
-    setTimeout(function () {
-      fetchBoard().then(renderBoard)['catch'](function () {});
-    }, 400);
+    el.boardWho.hidden = false;
+
+    if (!state.firstResult) {
+      el.boardWho.textContent =
+        'Playing as ' + name + '. Finish today\'s first round to appear here.';
+      return;
+    }
+
+    el.boardWho.textContent = 'Playing as ' + name + '. Sending…';
+    postScore().then(function (ok) {
+      if (!ok) {
+        el.boardWho.textContent =
+          'Playing as ' + name + '. Your score didn\'t send — reopen the board to retry.';
+        return;
+      }
+      return fetchBoard().then(renderBoard);
+    })['catch'](function () {});
   }
 
   function bar(host, label, width, text, filled) {
@@ -1650,6 +1757,7 @@
     clearTimeout(copyTimer);
     el.share.textContent = 'Copy today\'s results';
     el.fallback.hidden = true;
+    el.verdictBoard.hidden = true;
     el.round.hidden = state.round === 1;
     el.round.textContent = 'Round ' + state.round;
 
@@ -1714,6 +1822,14 @@
     state.firstResult = saved.firstResult || 0;
     state.posted = !!saved.posted;
     state.history = (saved.history || []).map(rehydrate);
+
+    // A round one played before the board existed has no stored result. It is
+    // sitting in the day's history though, so recover it rather than locking
+    // the player out of the board until tomorrow.
+    if (!state.firstResult && state.history.length && state.history[0].round === 1) {
+      var first = state.history[0];
+      state.firstResult = first.won ? first.tries : 7;
+    }
     // A round that already ended has been seen. Move on rather than replaying it.
     state.round = saved.done ? saved.round + 1 : saved.round;
     renderHistory();
@@ -1755,6 +1871,11 @@
   el.statsX.addEventListener('click', closeStats);
 
   el.boardBtn.hidden = !boardOn;
+  el.helpBoard.hidden = !boardOn;
+  el.verdictJoinBtn.addEventListener('click', joinFromVerdict);
+  el.verdictName.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') { e.preventDefault(); joinFromVerdict(); }
+  });
   el.boardBtn.addEventListener('click', openBoard);
   el.boardClose.addEventListener('click', closeBoard);
   el.boardX.addEventListener('click', closeBoard);
