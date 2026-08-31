@@ -176,6 +176,183 @@
   .summary p{margin:0 0 22px;font-size:15px;line-height:1.55;color:var(--muted);max-width:46ch}
   .summary .buttons{display:flex;gap:10px;flex-wrap:wrap}
 
+  /* ---------- the board ---------- */
+
+  function postScore() {
+    if (!boardOn || !state.name || state.posted || state.firstScore < 0) {
+      return Promise.resolve(false);
+    }
+    return fetch(BOARD.url + '/rest/v1/passable_scores', {
+      method: 'POST',
+      headers: boardHeaders(),
+      body: JSON.stringify({
+        day: state.day, client_id: state.clientId,
+        name: state.name, score: state.firstScore
+      })
+    }).then(function (res) {
+      // 409 is the unique key refusing a second score for today: the rule working.
+      if (res.ok || res.status === 409) { state.posted = true; persist(); return true; }
+      return false;
+    })['catch'](function () { return false; });
+  }
+
+  function fetchBoard() {
+    var q = '/rest/v1/passable_board?select=name,score,created_at&day=eq.' + state.day +
+            '&order=score.desc,created_at.asc&limit=500';
+    return fetch(BOARD.url + q, { headers: boardHeaders() }).then(function (res) {
+      if (!res.ok) throw new Error('board unavailable');
+      return res.json();
+    });
+  }
+
+  function renderBoard(rows) {
+    var total = rows.length;
+    var buckets = [], i;
+    for (i = 0; i <= PER_SET; i++) buckets.push(0);
+    rows.forEach(function (row) {
+      if (row.score >= 0 && row.score <= PER_SET) buckets[row.score] += 1;
+    });
+
+    var mine = state.firstScore;
+    var peak = Math.max.apply(null, buckets.concat([1]));
+
+    el.boardDist.innerHTML = '';
+    for (i = PER_SET; i >= 0; i--) {
+      var row = document.createElement('div');
+      row.className = 'bar' + (mine === i ? ' you' : '');
+      var t = document.createElement('span');
+      t.className = 't';
+      t.textContent = i + ' / ' + PER_SET;
+      var fill = document.createElement('span');
+      fill.className = 'fill' + (buckets[i] ? ' on' : '');
+      fill.style.width = Math.round(buckets[i] / peak * 100) + '%';
+      fill.textContent = buckets[i];
+      row.appendChild(t); row.appendChild(fill);
+      el.boardDist.appendChild(row);
+    }
+
+    if (mine >= 0 && total) {
+      var behind = rows.filter(function (r) { return r.score < mine; }).length;
+      el.boardYou.textContent = 'You got ' + mine + ' of ' + PER_SET + ', ahead of ' +
+        Math.round(behind / total * 100) + '% of today\'s ' + total + ' players.';
+    } else if (mine >= 0) {
+      el.boardYou.textContent = 'You got ' + mine + ' of ' + PER_SET +
+        '. Nobody else has played yet.';
+    } else {
+      el.boardYou.textContent = 'Finish today\'s first set to take a place on the board.';
+    }
+
+    el.boardList.innerHTML = '';
+    rows.slice(0, 10).forEach(function (r, n) {
+      var li = document.createElement('li');
+      var pos = document.createElement('span'); pos.className = 'pos'; pos.textContent = n + 1;
+      var nm = document.createElement('span'); nm.className = 'nm'; nm.textContent = r.name;
+      var sc = document.createElement('span'); sc.className = 'sc';
+      sc.textContent = r.score + '/' + PER_SET;
+      li.appendChild(pos); li.appendChild(nm); li.appendChild(sc);
+      el.boardList.appendChild(li);
+    });
+
+    var joined = !!state.name;
+    el.boardJoin.hidden = joined;
+    el.boardWho.hidden = !joined;
+    if (joined) {
+      el.boardWho.textContent = state.posted
+        ? 'Playing as ' + state.name + '. Your score is in.'
+        : (state.firstScore >= 0
+            ? 'Playing as ' + state.name + '. Your score hasn\'t sent — reopen the board to retry.'
+            : 'Playing as ' + state.name + '. Finish today\'s first set to appear here.');
+    }
+    el.boardBody.hidden = false;
+    el.boardState.hidden = true;
+  }
+
+  function openBoard() {
+    el.boardBody.hidden = true;
+    el.boardJoin.hidden = true;
+    el.boardWho.hidden = true;
+    el.boardState.hidden = false;
+    el.boardState.textContent = 'Loading today\'s board…';
+
+    if (typeof el.board.showModal === 'function') el.board.showModal();
+    else el.board.setAttribute('open', '');
+
+    // Send anything pending before reading, so a failed post gets another go
+    // every time the board is opened.
+    postScore().then(fetchBoard).then(renderBoard)['catch'](function () {
+      el.boardState.textContent =
+        'Couldn\'t reach the board just now. Your sets are safe either way.';
+      el.boardJoin.hidden = !!state.name;
+    });
+  }
+
+  function closeBoard() {
+    if (typeof el.board.close === 'function') el.board.close();
+    else el.board.removeAttribute('open');
+  }
+
+  function joinFrom(input, after) {
+    var name = cleanName(input.value);
+    if (!name) { input.focus(); return; }
+    state.name = name;
+    persist();
+    after(name);
+  }
+
+  function joinBoard() {
+    joinFrom(el.boardName, function () {
+      el.boardJoin.hidden = true;
+      el.boardWho.hidden = false;
+      if (state.firstScore < 0) {
+        el.boardWho.textContent = 'Playing as ' + state.name +
+          '. Finish today\'s first set to appear here.';
+        return;
+      }
+      el.boardWho.textContent = 'Playing as ' + state.name + '. Sending…';
+      postScore().then(function (ok) {
+        if (!ok) {
+          el.boardWho.textContent = 'Playing as ' + state.name +
+            '. Your score didn\'t send — reopen the board to retry.';
+          return;
+        }
+        return fetchBoard().then(renderBoard);
+      })['catch'](function () {});
+    });
+  }
+
+  // Shown under the set summary, where the ask is worth something: the player
+  // has a score in front of them and a reason to want it compared.
+  function updateSummaryBoard() {
+    if (!boardOn || state.firstScore < 0) { el.sumBoard.hidden = true; return; }
+    if (state.posted && state.round !== 1) { el.sumBoard.hidden = true; return; }
+    el.sumBoard.hidden = false;
+
+    if (!state.name) {
+      el.sumJoinRow.hidden = false;
+      el.sumBoardText.textContent =
+        'Put this on today\'s board. Your first set is the one that counts.';
+      return;
+    }
+    el.sumJoinRow.hidden = true;
+    if (state.posted) {
+      el.sumBoardText.textContent = 'On today\'s board as ' + state.name + '.';
+      return;
+    }
+    el.sumBoardText.textContent = 'Sending your score…';
+    postScore().then(function (ok) {
+      el.sumBoardText.textContent = ok
+        ? 'On today\'s board as ' + state.name + '.'
+        : 'Couldn\'t reach the board. Open Board to try again.';
+    });
+  }
+
+  function joinFromSummary() {
+    joinFrom(el.sumName, function () {
+      el.sumJoinRow.hidden = true;
+      updateSummaryBoard();
+    });
+  }
+
   /* ---------- dialogs ---------- */
   dialog{
     position:relative;border:1px solid var(--ink);border-radius:0;
@@ -224,6 +401,36 @@
   }
   .dist .bar .fill.on{background:var(--ink);color:var(--paper)}
 
+  /* ---------- leaderboard ---------- */
+  .board-you{margin:0 0 4px;font-size:14.5px;line-height:1.55;max-width:44ch}
+  .board-who{margin:18px 0 20px;font-size:12.5px;line-height:1.5;color:var(--muted);max-width:44ch}
+  /* Your own row is marked with a rule, not a colour — same discipline as the
+     rest of the interface. */
+  .dist .bar.you .t{color:var(--ink);font-weight:600}
+  .dist .bar.you .fill{box-shadow:inset 0 0 0 1px var(--ink)}
+
+  .board-list{list-style:none;margin:0;padding:0;display:grid;gap:0}
+  .board-list li{
+    display:grid;grid-template-columns:20px 1fr auto;gap:12px;align-items:baseline;
+    font-size:13.5px;padding:9px 0;border-top:1px solid var(--rule);
+  }
+  .board-list li:last-child{border-bottom:1px solid var(--rule)}
+  .board-list .pos{color:var(--muted);text-align:right}
+  .board-list .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .board-list .sc{font-family:"IBM Plex Mono",monospace;font-size:12.5px}
+
+  .join-row{display:flex;gap:9px;margin-bottom:4px}
+  .join-row input{
+    flex:1;min-width:0;padding:12px 12px;
+    background:transparent;border:1px solid var(--ink);
+    color:var(--ink);font-family:inherit;font-size:14px;
+  }
+  .join-row input::placeholder{color:var(--muted)}
+  .join-row input:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+
+  .sum-board{margin-top:28px;padding-top:20px;border-top:1px solid var(--rule)}
+  .sum-board p{margin:0 0 12px;font-size:13.5px;line-height:1.55;color:var(--muted);max-width:44ch}
+
   .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 
   @media (prefers-reduced-motion:reduce){*{animation:none !important;transition:none !important}}
@@ -263,6 +470,7 @@
       <div class="meta">
         <span id="puzzleNo">No. 1</span>
         <button class="mode" id="themeBtn" type="button" aria-pressed="false">Dark</button>
+        <button class="mode" id="boardBtn" type="button" hidden>Board</button>
         <button class="mode" id="statsBtn" type="button">Stats</button>
         <button class="mode" id="helpBtn" type="button">How to play</button>
       </div>
@@ -315,6 +523,14 @@
           <button class="btn" id="againBtn" type="button">Next ten</button>
           <button class="btn ghost" id="summaryStats" type="button">See your record</button>
         </div>
+
+        <div class="sum-board" id="sumBoard" hidden>
+          <p id="sumBoardText"></p>
+          <div class="join-row" id="sumJoinRow" hidden>
+            <input id="sumName" type="text" maxlength="20" autocomplete="nickname" placeholder="Your name">
+            <button class="btn" id="sumJoinBtn" type="button">Join</button>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -350,6 +566,39 @@
     exists.</p>
 
     <button class="btn" id="helpClose" type="button">Start</button>
+  </dialog>
+
+  <dialog id="board" aria-labelledby="boardTitle">
+    <button class="close" id="boardX" type="button" aria-label="Close the board">
+      <svg viewBox="0 0 14 14" aria-hidden="true" focusable="false">
+        <path d="M1 1 L13 13 M13 1 L1 13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+      </svg>
+    </button>
+
+    <h2 id="boardTitle">Today's board</h2>
+    <p class="stat-empty" id="boardState">Loading today's board…</p>
+
+    <div id="boardBody" hidden>
+      <p class="board-you" id="boardYou"></p>
+      <h3 class="stat-label">How everyone did on their first set</h3>
+      <div class="dist" id="boardDist"></div>
+      <h3 class="stat-label">Best today</h3>
+      <ol class="board-list" id="boardList"></ol>
+    </div>
+
+    <div id="boardJoin" hidden>
+      <label class="stat-label" for="boardName">Add a name to take a place</label>
+      <div class="join-row">
+        <input id="boardName" type="text" maxlength="20" autocomplete="nickname" placeholder="Your name">
+        <button class="btn" id="boardJoinBtn" type="button">Join</button>
+      </div>
+      <p class="stat-note">Your name and your first set of the day are public and
+      can't be edited afterwards. Only the first set counts — later ones are practice.</p>
+    </div>
+
+    <p class="board-who" id="boardWho" hidden></p>
+
+    <button class="btn ghost" id="boardClose" type="button">Back to the game</button>
   </dialog>
 
   <dialog id="stats" aria-labelledby="statsTitle">
@@ -431,6 +680,46 @@
       save: function (d) { mem = d; return Promise.resolve(); }
     };
   })();
+
+  /* ---------- leaderboard ----------
+     Same project as Hueristic, separate table. The anon key is meant to be
+     public; the rules live in the database. Never the service_role key. */
+  var BOARD = {
+    url: 'https://tmaukbgdkkqcbwqgrmje.supabase.co',
+    key: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRtYXVrYmdka2txY2J3cWdybWplIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgxOTEwMDksImV4cCI6MjEwMzc2NzAwOX0.bHY8hNm35EtsDxSIibm8c06jxGX-oS_5UEAZN1XzDSc'
+  };
+
+  var boardOn = !!(BOARD.url && BOARD.key);
+
+  function keyRole(key) {
+    try {
+      var p = key.split('.')[1];
+      return p ? (JSON.parse(atob(p.replace(/-/g, '+').replace(/_/g, '/'))).role || '') : '';
+    } catch (e) { return ''; }
+  }
+  if (boardOn && (/^sb_secret_/.test(BOARD.key) || keyRole(BOARD.key) === 'service_role')) {
+    boardOn = false;
+    if (window.console && console.error) {
+      console.error('Passable: that is a Supabase secret key, not the publishable one. ' +
+                    'The board is off. Replace it and rotate the key you pasted.');
+    }
+  }
+
+  function boardHeaders() {
+    var h = { 'apikey': BOARD.key, 'Content-Type': 'application/json' };
+    if (BOARD.key.slice(0, 3) === 'eyJ') h['Authorization'] = 'Bearer ' + BOARD.key;
+    return h;
+  }
+
+  function uuid() {
+    if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+      var r = Math.random() * 16 | 0;
+      return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+    });
+  }
+
+  function cleanName(v) { return String(v).replace(/\s+/g, ' ').trim().slice(0, 20); }
 
   /* ---------- colour ---------- */
 
@@ -563,7 +852,6 @@
   /* ---------- state ---------- */
 
   var el = {
-    wordmark: document.getElementById('wordmark'),
     puzzleNo: document.getElementById('puzzleNo'),
     progress: document.getElementById('progress'),
     sample: document.getElementById('sample'),
@@ -592,6 +880,24 @@
     helpX: document.getElementById('helpX'),
     stats: document.getElementById('stats'),
     statsBtn: document.getElementById('statsBtn'),
+    boardBtn: document.getElementById('boardBtn'),
+    board: document.getElementById('board'),
+    boardX: document.getElementById('boardX'),
+    boardClose: document.getElementById('boardClose'),
+    boardState: document.getElementById('boardState'),
+    boardBody: document.getElementById('boardBody'),
+    boardYou: document.getElementById('boardYou'),
+    boardDist: document.getElementById('boardDist'),
+    boardList: document.getElementById('boardList'),
+    boardJoin: document.getElementById('boardJoin'),
+    boardWho: document.getElementById('boardWho'),
+    boardName: document.getElementById('boardName'),
+    boardJoinBtn: document.getElementById('boardJoinBtn'),
+    sumBoard: document.getElementById('sumBoard'),
+    sumBoardText: document.getElementById('sumBoardText'),
+    sumJoinRow: document.getElementById('sumJoinRow'),
+    sumName: document.getElementById('sumName'),
+    sumJoinBtn: document.getElementById('sumJoinBtn'),
     themeBtn: document.getElementById('themeBtn'),
     statsClose: document.getElementById('statsClose'),
     statsX: document.getElementById('statsX'),
@@ -609,6 +915,10 @@
     at: 0,
     answers: [],      // the level the player picked, per pair
     seenHelp: false,
+    clientId: '',
+    name: '',
+    firstScore: -1,   // the day's first set, out of ten. -1 = not finished yet
+    posted: false,
     // Survives the daily reset. lean[d] counts answers d-1 steps from the truth,
     // so index 0 is "two too harsh" and index 4 is "two too generous".
     record: { asked: 0, right: 0, lean: [0, 0, 0, 0, 0], sets: 0, days: 0, lastDay: -1 }
@@ -622,6 +932,10 @@
       at: state.at,
       answers: state.answers,
       seenHelp: state.seenHelp,
+      clientId: state.clientId,
+      name: state.name,
+      firstScore: state.firstScore,
+      posted: state.posted,
       record: state.record
     });
   }
@@ -732,12 +1046,17 @@
 
     state.record.sets += 1;
 
+    // Only the opening set of the day goes to the board. With unlimited sets,
+    // "best of the day" would just reward whoever played the most.
+    if (state.round === 1 && state.firstScore < 0) state.firstScore = right;
+
     el.answers.hidden = true;
     el.ask.hidden = true;
     el.result.hidden = true;
     el.summary.hidden = false;
 
     el.summaryTitle.textContent = right + ' of ' + PER_SET + ' right';
+    updateSummaryBoard();
     el.summaryText.textContent = right === PER_SET
       ? 'A clean set. The near-threshold pairs are the ones worth being smug about.'
       : (right >= 7
@@ -826,6 +1145,183 @@
     el.statsNote.textContent = notes.join(' ');
   }
 
+  /* ---------- the board ---------- */
+
+  function postScore() {
+    if (!boardOn || !state.name || state.posted || state.firstScore < 0) {
+      return Promise.resolve(false);
+    }
+    return fetch(BOARD.url + '/rest/v1/passable_scores', {
+      method: 'POST',
+      headers: boardHeaders(),
+      body: JSON.stringify({
+        day: state.day, client_id: state.clientId,
+        name: state.name, score: state.firstScore
+      })
+    }).then(function (res) {
+      // 409 is the unique key refusing a second score for today: the rule working.
+      if (res.ok || res.status === 409) { state.posted = true; persist(); return true; }
+      return false;
+    })['catch'](function () { return false; });
+  }
+
+  function fetchBoard() {
+    var q = '/rest/v1/passable_board?select=name,score,created_at&day=eq.' + state.day +
+            '&order=score.desc,created_at.asc&limit=500';
+    return fetch(BOARD.url + q, { headers: boardHeaders() }).then(function (res) {
+      if (!res.ok) throw new Error('board unavailable');
+      return res.json();
+    });
+  }
+
+  function renderBoard(rows) {
+    var total = rows.length;
+    var buckets = [], i;
+    for (i = 0; i <= PER_SET; i++) buckets.push(0);
+    rows.forEach(function (row) {
+      if (row.score >= 0 && row.score <= PER_SET) buckets[row.score] += 1;
+    });
+
+    var mine = state.firstScore;
+    var peak = Math.max.apply(null, buckets.concat([1]));
+
+    el.boardDist.innerHTML = '';
+    for (i = PER_SET; i >= 0; i--) {
+      var row = document.createElement('div');
+      row.className = 'bar' + (mine === i ? ' you' : '');
+      var t = document.createElement('span');
+      t.className = 't';
+      t.textContent = i + ' / ' + PER_SET;
+      var fill = document.createElement('span');
+      fill.className = 'fill' + (buckets[i] ? ' on' : '');
+      fill.style.width = Math.round(buckets[i] / peak * 100) + '%';
+      fill.textContent = buckets[i];
+      row.appendChild(t); row.appendChild(fill);
+      el.boardDist.appendChild(row);
+    }
+
+    if (mine >= 0 && total) {
+      var behind = rows.filter(function (r) { return r.score < mine; }).length;
+      el.boardYou.textContent = 'You got ' + mine + ' of ' + PER_SET + ', ahead of ' +
+        Math.round(behind / total * 100) + '% of today\'s ' + total + ' players.';
+    } else if (mine >= 0) {
+      el.boardYou.textContent = 'You got ' + mine + ' of ' + PER_SET +
+        '. Nobody else has played yet.';
+    } else {
+      el.boardYou.textContent = 'Finish today\'s first set to take a place on the board.';
+    }
+
+    el.boardList.innerHTML = '';
+    rows.slice(0, 10).forEach(function (r, n) {
+      var li = document.createElement('li');
+      var pos = document.createElement('span'); pos.className = 'pos'; pos.textContent = n + 1;
+      var nm = document.createElement('span'); nm.className = 'nm'; nm.textContent = r.name;
+      var sc = document.createElement('span'); sc.className = 'sc';
+      sc.textContent = r.score + '/' + PER_SET;
+      li.appendChild(pos); li.appendChild(nm); li.appendChild(sc);
+      el.boardList.appendChild(li);
+    });
+
+    var joined = !!state.name;
+    el.boardJoin.hidden = joined;
+    el.boardWho.hidden = !joined;
+    if (joined) {
+      el.boardWho.textContent = state.posted
+        ? 'Playing as ' + state.name + '. Your score is in.'
+        : (state.firstScore >= 0
+            ? 'Playing as ' + state.name + '. Your score hasn\'t sent — reopen the board to retry.'
+            : 'Playing as ' + state.name + '. Finish today\'s first set to appear here.');
+    }
+    el.boardBody.hidden = false;
+    el.boardState.hidden = true;
+  }
+
+  function openBoard() {
+    el.boardBody.hidden = true;
+    el.boardJoin.hidden = true;
+    el.boardWho.hidden = true;
+    el.boardState.hidden = false;
+    el.boardState.textContent = 'Loading today\'s board…';
+
+    if (typeof el.board.showModal === 'function') el.board.showModal();
+    else el.board.setAttribute('open', '');
+
+    // Send anything pending before reading, so a failed post gets another go
+    // every time the board is opened.
+    postScore().then(fetchBoard).then(renderBoard)['catch'](function () {
+      el.boardState.textContent =
+        'Couldn\'t reach the board just now. Your sets are safe either way.';
+      el.boardJoin.hidden = !!state.name;
+    });
+  }
+
+  function closeBoard() {
+    if (typeof el.board.close === 'function') el.board.close();
+    else el.board.removeAttribute('open');
+  }
+
+  function joinFrom(input, after) {
+    var name = cleanName(input.value);
+    if (!name) { input.focus(); return; }
+    state.name = name;
+    persist();
+    after(name);
+  }
+
+  function joinBoard() {
+    joinFrom(el.boardName, function () {
+      el.boardJoin.hidden = true;
+      el.boardWho.hidden = false;
+      if (state.firstScore < 0) {
+        el.boardWho.textContent = 'Playing as ' + state.name +
+          '. Finish today\'s first set to appear here.';
+        return;
+      }
+      el.boardWho.textContent = 'Playing as ' + state.name + '. Sending…';
+      postScore().then(function (ok) {
+        if (!ok) {
+          el.boardWho.textContent = 'Playing as ' + state.name +
+            '. Your score didn\'t send — reopen the board to retry.';
+          return;
+        }
+        return fetchBoard().then(renderBoard);
+      })['catch'](function () {});
+    });
+  }
+
+  // Shown under the set summary, where the ask is worth something: the player
+  // has a score in front of them and a reason to want it compared.
+  function updateSummaryBoard() {
+    if (!boardOn || state.firstScore < 0) { el.sumBoard.hidden = true; return; }
+    if (state.posted && state.round !== 1) { el.sumBoard.hidden = true; return; }
+    el.sumBoard.hidden = false;
+
+    if (!state.name) {
+      el.sumJoinRow.hidden = false;
+      el.sumBoardText.textContent =
+        'Put this on today\'s board. Your first set is the one that counts.';
+      return;
+    }
+    el.sumJoinRow.hidden = true;
+    if (state.posted) {
+      el.sumBoardText.textContent = 'On today\'s board as ' + state.name + '.';
+      return;
+    }
+    el.sumBoardText.textContent = 'Sending your score…';
+    postScore().then(function (ok) {
+      el.sumBoardText.textContent = ok
+        ? 'On today\'s board as ' + state.name + '.'
+        : 'Couldn\'t reach the board. Open Board to try again.';
+    });
+  }
+
+  function joinFromSummary() {
+    joinFrom(el.sumName, function () {
+      el.sumJoinRow.hidden = true;
+      updateSummaryBoard();
+    });
+  }
+
   /* ---------- dialogs ---------- */
 
   function openHelp() {
@@ -875,6 +1371,8 @@
   function startDay(saved) {
     state.day = dayIndex();
     state.seenHelp = !!(saved && saved.seenHelp);
+    state.clientId = (saved && saved.clientId) || uuid();
+    state.name = (saved && typeof saved.name === 'string') ? saved.name : '';
     el.puzzleNo.textContent = 'No. ' + (state.day + 1);
     document.title = NAME + ' — how far does this pair go?';
 
@@ -895,6 +1393,8 @@
     }
 
     var sameDay = saved && saved.day === state.day;
+    state.firstScore = sameDay && typeof saved.firstScore === 'number' ? saved.firstScore : -1;
+    state.posted = sameDay ? !!saved.posted : false;
     state.round = sameDay ? (saved.round || 1) : 1;
     startRound();
 
@@ -925,12 +1425,26 @@
   el.helpClose.addEventListener('click', closeHelp);
   el.helpX.addEventListener('click', closeHelp);
   el.themeBtn.addEventListener('click', function () { applyTheme(!darkNow(), true); });
+  el.boardBtn.hidden = !boardOn;
+  el.boardBtn.addEventListener('click', openBoard);
+  el.boardClose.addEventListener('click', closeBoard);
+  el.boardX.addEventListener('click', closeBoard);
+  el.boardJoinBtn.addEventListener('click', joinBoard);
+  el.sumJoinBtn.addEventListener('click', joinFromSummary);
+  [el.boardName, el.sumName].forEach(function (input) {
+    input.addEventListener('keydown', function (e) {
+      if (e.key !== 'Enter') return;
+      e.preventDefault();
+      if (input === el.boardName) joinBoard(); else joinFromSummary();
+    });
+  });
+
   el.statsBtn.addEventListener('click', openStats);
   el.statsClose.addEventListener('click', closeStats);
   el.statsX.addEventListener('click', closeStats);
 
   document.addEventListener('keydown', function (e) {
-    if (el.help.open || el.stats.open) return;
+    if (el.help.open || el.stats.open || el.board.open) return;
     if (e.key === '1' || e.key === '2' || e.key === '3') {
       if (!el.answers.hidden) { e.preventDefault(); answer(+e.key - 1); }
     } else if (e.key === 'Enter' && !el.result.hidden) {
