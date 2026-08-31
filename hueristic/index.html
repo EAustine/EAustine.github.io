@@ -1,0 +1,1961 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Hueristic — guess today's colour</title>
+<meta name="description" content="A hidden color, three sliders, six tries to match it. A new set every day.">
+<meta name="theme-color" content="#58585a">
+
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="icon" href="favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+
+<!-- SOCIAL PREVIEW — the one thing in this file that can't configure itself.
+     Link crawlers don't run JavaScript, so these URLs have to be written out in
+     full. If you ever move the game, update these three lines and the SITE
+     fallback in the script. -->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Hueristic">
+<meta property="og:title" content="Hueristic">
+<meta property="og:description" content="A hidden color, three sliders, six tries to match it.">
+<meta property="og:url" content="https://eaustine.github.io/hueristic/">
+<meta property="og:image" content="https://eaustine.github.io/hueristic/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="A blue swatch above a hue slider, beside the word Hueristic.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Hueristic">
+<meta name="twitter:description" content="A hidden color, three sliders, six tries to match it.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --field:#58585a;
+    --panel:#4d4d4f;
+    --ink:#f5f5f5;
+    --dim:#b6b6b9;
+    --edge:rgba(255,255,255,.16);
+    --edge-strong:rgba(255,255,255,.55);
+    --shadow:0 1px 0 rgba(0,0,0,.25), 0 8px 24px rgba(0,0,0,.18);
+    --gap:18px;
+  }
+
+  *{box-sizing:border-box}
+
+  /* Class rules that set display would otherwise outrank the browser's own
+     [hidden] rule, leaving hidden elements on screen. */
+  [hidden]{display:none !important}
+
+  html,body{height:100%}
+
+  body{
+    margin:0;
+    background:var(--field);
+    color:var(--ink);
+    font-family:Archivo,-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;
+    font-variant-numeric:tabular-nums;
+    -webkit-font-smoothing:antialiased;
+    display:flex;
+    justify-content:center;
+    padding:24px 18px 48px;
+  }
+
+  .app{width:100%;max-width:480px}
+
+  /* ---------- header ---------- */
+  header{
+    display:flex;
+    align-items:baseline;
+    justify-content:space-between;
+    gap:12px;
+    padding-bottom:14px;
+    border-bottom:1px solid var(--edge);
+  }
+
+  .wordmark{
+    font-size:19px;
+    font-weight:800;
+    letter-spacing:-.03em;
+    margin:0;
+  }
+
+  .meta{
+    display:flex;
+    align-items:baseline;
+    flex-wrap:wrap;
+    justify-content:flex-end;
+    gap:6px 13px;
+    font-size:13px;
+    color:var(--dim);
+  }
+
+  .mode{
+    appearance:none;
+    background:none;
+    border:0;
+    padding:0;
+    font:inherit;
+    font-size:13px;
+    color:var(--ink);
+    border-bottom:1px solid var(--edge-strong);
+    cursor:pointer;
+  }
+  .mode:hover{border-bottom-color:var(--ink)}
+
+  /* ---------- hero swatch ---------- */
+  .stage{
+    margin:var(--gap) 0;
+    display:flex;
+    border-radius:2px;
+    overflow:hidden;
+    box-shadow:var(--shadow);
+    height:200px;
+  }
+  .stage .face{flex:1;position:relative}
+  .stage .face + .face{border-left:1px solid rgba(0,0,0,.28)}
+
+  .face-tag{
+    position:absolute;
+    left:10px;
+    bottom:9px;
+    font-size:11px;
+    font-weight:600;
+    letter-spacing:.01em;
+    padding:3px 7px;
+    border-radius:2px;
+    background:rgba(255,255,255,.9);
+    color:#2b2b2d;
+    opacity:0;
+  }
+  .stage.revealed .face-tag{opacity:1}
+
+  /* ---------- sliders ---------- */
+  .controls{display:grid;gap:11px}
+
+  .row{
+    display:grid;
+    grid-template-columns:16px 1fr 34px;
+    align-items:center;
+    gap:12px;
+  }
+
+  .row label{font-size:13px;font-weight:600;color:var(--dim)}
+  .row output{font-size:14px;font-weight:600;text-align:right}
+
+  input[type=range]{
+    appearance:none;
+    -webkit-appearance:none;
+    width:100%;
+    height:26px;
+    background:transparent;
+    margin:0;
+    cursor:grab;
+  }
+  input[type=range]:active{cursor:grabbing}
+
+  input[type=range]::-webkit-slider-runnable-track{
+    height:22px;
+    border-radius:2px;
+    background:var(--track);
+    box-shadow:inset 0 0 0 1px rgba(0,0,0,.22);
+  }
+  input[type=range]::-moz-range-track{
+    height:22px;
+    border-radius:2px;
+    background:var(--track);
+    box-shadow:inset 0 0 0 1px rgba(0,0,0,.22);
+  }
+
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none;
+    width:6px;
+    height:30px;
+    margin-top:-4px;
+    border-radius:2px;
+    background:#fff;
+    box-shadow:0 0 0 1px rgba(0,0,0,.4), 0 1px 3px rgba(0,0,0,.4);
+  }
+  input[type=range]::-moz-range-thumb{
+    width:6px;
+    height:30px;
+    border:0;
+    border-radius:2px;
+    background:#fff;
+    box-shadow:0 0 0 1px rgba(0,0,0,.4), 0 1px 3px rgba(0,0,0,.4);
+  }
+
+  input[type=range]:focus{outline:none}
+  input[type=range]:focus-visible::-webkit-slider-thumb{box-shadow:0 0 0 2px var(--field), 0 0 0 4px #fff}
+  input[type=range]:focus-visible::-moz-range-thumb{box-shadow:0 0 0 2px var(--field), 0 0 0 4px #fff}
+
+  /* ---------- action bar ---------- */
+  .actions{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:14px;
+    margin-top:var(--gap);
+  }
+
+  .btn{
+    appearance:none;
+    font:inherit;
+    font-weight:600;
+    font-size:15px;
+    padding:11px 20px;
+    border-radius:2px;
+    border:1px solid transparent;
+    background:var(--ink);
+    color:#2b2b2d;
+    cursor:pointer;
+  }
+  .btn:hover{background:#fff}
+  .btn:focus-visible{outline:2px solid #fff;outline-offset:2px}
+
+  .btn.ghost{background:transparent;color:var(--ink);border-color:var(--edge-strong)}
+  .btn.ghost:hover{border-color:var(--ink);background:rgba(255,255,255,.06)}
+
+  .btn[disabled],
+  .btn[disabled]:hover{
+    background:transparent;
+    color:var(--dim);
+    border-color:var(--edge);
+    cursor:not-allowed;
+  }
+
+  .status{display:flex;align-items:baseline;gap:11px}
+  .tries{font-size:13px;color:var(--dim)}
+  .round{font-size:13px;font-weight:600;color:var(--ink)}
+
+  /* ---------- today's history ---------- */
+  .today{
+    margin-top:24px;
+    padding-top:18px;
+    border-top:1px solid var(--edge);
+  }
+  .today h2{
+    margin:0 0 12px;
+    font-size:13px;
+    font-weight:600;
+    color:var(--dim);
+  }
+  .rounds{list-style:none;margin:0;padding:0;display:grid;gap:7px}
+  .rounds li{
+    display:grid;
+    grid-template-columns:26px 1fr auto;
+    gap:11px;
+    align-items:center;
+    font-size:13.5px;
+  }
+  .rounds .sw{height:22px;border-radius:2px;box-shadow:inset 0 0 0 1px rgba(0,0,0,.25)}
+  .rounds .n{color:var(--dim)}
+  .rounds .score{font-weight:600}
+  .rounds .score.miss{color:var(--dim);font-weight:500}
+  .summary{margin:13px 0 0;font-size:12.5px;color:var(--dim)}
+
+  /* ---------- verdict ---------- */
+  .verdict{margin-top:var(--gap)}
+  .verdict p{margin:0 0 12px;font-size:15px;line-height:1.5;max-width:44ch}
+  .verdict .answer{font-weight:600}
+  .verdict .buttons{display:flex;gap:10px;flex-wrap:wrap}
+
+  .fallback{margin-top:15px}
+  .fallback p{margin:0 0 8px;font-size:12.5px;color:var(--dim);max-width:44ch}
+  .fallback textarea{
+    width:100%;
+    padding:10px 11px;
+    background:rgba(0,0,0,.2);
+    border:1px solid var(--edge);
+    border-radius:2px;
+    color:var(--ink);
+    font-family:inherit;
+    font-size:13px;
+    line-height:1.55;
+    resize:vertical;
+  }
+  .fallback textarea:focus-visible{
+    outline:2px solid #fff;
+    outline-offset:2px;
+    border-color:var(--edge-strong);
+  }
+
+  /* ---------- guess log ---------- */
+  .log{
+    list-style:none;
+    margin:22px 0 0;
+    padding:18px 0 0;
+    border-top:1px solid var(--edge);
+    display:grid;
+    gap:8px;
+  }
+
+  .log li{
+    display:grid;
+    grid-template-columns:26px repeat(3,1fr);
+    gap:8px;
+    align-items:stretch;
+  }
+
+  .log .chip-swatch{border-radius:2px;box-shadow:inset 0 0 0 1px rgba(0,0,0,.25)}
+
+  .chip{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:6px;
+    padding:6px 9px;
+    border-radius:2px;
+    font-size:13px;
+    font-weight:500;
+    border:1px solid transparent;
+  }
+  .chip .k{font-weight:600}
+  .chip .arrow{font-size:14px;line-height:1}
+
+  .chip.lock{background:var(--ink);color:#2b2b2d;border-color:var(--ink)}
+  .chip.near{border-color:var(--edge-strong);color:var(--ink)}
+  .chip.far{border-color:var(--edge);color:var(--dim)}
+
+  .hint{
+    margin:16px 0 0;
+    font-size:12.5px;
+    line-height:1.6;
+    color:var(--dim);
+    max-width:48ch;
+  }
+
+  /* ---------- instructions ---------- */
+  dialog{
+    position:relative;
+    border:1px solid var(--edge-strong);
+    border-radius:2px;
+    background:#454547;
+    color:var(--ink);
+    padding:26px 24px 24px;
+    width:calc(100% - 36px);
+    max-width:396px;
+    box-shadow:0 24px 64px rgba(0,0,0,.45);
+  }
+  dialog::backdrop{background:rgba(0,0,0,.52)}
+
+  dialog .close{
+    position:absolute;
+    top:16px;
+    right:16px;
+    width:30px;
+    height:30px;
+    display:grid;
+    place-items:center;
+    padding:0;
+    border:1px solid var(--edge);
+    border-radius:2px;
+    background:transparent;
+    color:var(--dim);
+    cursor:pointer;
+  }
+  dialog .close:hover{color:var(--ink);border-color:var(--edge-strong)}
+  dialog .close:focus-visible{outline:2px solid #fff;outline-offset:2px}
+  dialog .close svg{width:13px;height:13px;display:block}
+
+  dialog h2{
+    margin:0 0 14px;
+    padding-right:38px;
+    font-size:17px;
+    font-weight:800;
+    letter-spacing:-.02em;
+  }
+  dialog p{
+    margin:0 0 14px;
+    font-size:14px;
+    line-height:1.6;
+    max-width:44ch;
+  }
+
+  .legend{list-style:none;margin:0 0 16px;padding:0;display:grid;gap:8px}
+  .legend li{display:grid;grid-template-columns:86px 1fr;gap:13px;align-items:center}
+  .legend p{margin:0;font-size:13.5px;line-height:1.45;color:var(--dim)}
+
+  /* ---------- stats ---------- */
+  .tallies{
+    display:grid;
+    grid-template-columns:repeat(3,1fr);
+    gap:12px;
+    margin:0 0 22px;
+  }
+  .tallies div{display:grid;gap:2px}
+  .tallies .v{font-size:26px;font-weight:800;letter-spacing:-.02em;line-height:1.1}
+  .tallies .k{font-size:12px;color:var(--dim);line-height:1.3}
+
+  .dist{display:grid;gap:6px}
+  .dist .bar{display:grid;grid-template-columns:14px 1fr;gap:10px;align-items:center}
+  .dist .bar .t{font-size:13px;color:var(--dim)}
+  .dist .bar .fill{
+    height:22px;
+    min-width:26px;
+    border-radius:2px;
+    background:rgba(255,255,255,.16);
+    display:flex;
+    align-items:center;
+    justify-content:flex-end;
+    padding-right:7px;
+    font-size:12.5px;
+    font-weight:600;
+    color:var(--dim);
+  }
+  .dist .bar .fill.on{background:var(--ink);color:#2b2b2d}
+
+  .stat-label{
+    margin:22px 0 10px;
+    font-size:12px;
+    font-weight:600;
+    color:var(--dim);
+  }
+  .stat-note{margin:16px 0 20px;font-size:12.5px;line-height:1.55;color:var(--dim);max-width:40ch}
+  .stat-empty{margin:0 0 20px;font-size:14px;line-height:1.6;color:var(--dim)}
+
+  /* ---------- leaderboard ---------- */
+  .board-you{margin:0 0 4px;font-size:14px;line-height:1.55;max-width:42ch}
+  .board-who{margin:18px 0 20px;font-size:12.5px;line-height:1.5;color:var(--dim);max-width:42ch}
+
+  /* Your own bar is marked by a rule beside it rather than a colour, for the
+     same reason the game's feedback carries no colour. */
+  .dist .bar.you .t{color:var(--ink);font-weight:600}
+  .dist .bar.you .fill{box-shadow:0 0 0 1px var(--edge-strong)}
+
+  .board-list{list-style:none;margin:0;padding:0;display:grid;gap:7px}
+  .board-list li{
+    display:grid;
+    grid-template-columns:18px 1fr auto;
+    gap:11px;
+    align-items:baseline;
+    font-size:13.5px;
+  }
+  .board-list .pos{color:var(--dim);text-align:right}
+  .board-list .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .board-list .score{font-weight:600}
+  .board-list .score.miss{color:var(--dim);font-weight:500}
+
+  .verdict-board{
+    margin-top:18px;
+    padding-top:16px;
+    border-top:1px solid var(--edge);
+  }
+  .verdict-board p{margin:0 0 10px;font-size:13px;line-height:1.55;color:var(--dim);max-width:44ch}
+
+  .join-row{display:flex;gap:9px;margin-bottom:4px}
+  .join-row input{
+    flex:1;
+    min-width:0;
+    padding:10px 11px;
+    background:rgba(0,0,0,.2);
+    border:1px solid var(--edge);
+    border-radius:2px;
+    color:var(--ink);
+    font-family:inherit;
+    font-size:14px;
+  }
+  .join-row input::placeholder{color:var(--dim)}
+  .join-row input:focus-visible{outline:2px solid #fff;outline-offset:2px;border-color:var(--edge-strong)}
+
+  /* ---------- shared result ---------- */
+  .shared{margin-top:var(--gap)}
+  /* width and height attributes are on the tag too, so the page doesn't jump
+     when the image arrives. No shadow: the card sits a clear step darker than
+     the page, and a shadow on top of that would darken the surrounding grey
+     and make the card read lighter than it is. */
+  .shared .hero{
+    display:block;
+    width:100%;
+    height:auto;
+    margin:0 0 22px;
+    border-radius:2px;
+  }
+  .shared h2{
+    margin:0 0 7px;
+    font-size:19px;
+    font-weight:800;
+    letter-spacing:-.03em;
+  }
+  .shared > p{
+    margin:0 0 22px;
+    font-size:14px;
+    line-height:1.55;
+    color:var(--dim);
+    max-width:44ch;
+  }
+  .results{display:grid;gap:20px;margin-bottom:26px}
+  .result-head{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    gap:12px;
+    margin-bottom:9px;
+    font-size:13.5px;
+  }
+  .result-head .n{color:var(--dim)}
+  .result-head .score{font-weight:600}
+  .result-head .score.miss{color:var(--dim);font-weight:500}
+
+  /* Narrow tiles, not full-width bars. Empty full-width rectangles with a
+     hairline border read as text inputs, which is the wrong invitation. */
+  .grid{display:grid;gap:5px;justify-content:start}
+  .grid .g,
+  .axis{display:grid;grid-template-columns:repeat(3,56px);gap:5px}
+  .axis{margin-bottom:6px}
+  .axis span{font-size:11px;color:var(--dim);text-align:center}
+  .cell{height:30px;border-radius:2px;border:1px solid transparent}
+  .cell.lock{background:var(--ink);border-color:var(--ink)}
+  .cell.near{border-color:var(--edge-strong)}
+  .cell.far{border-color:var(--edge)}
+
+  .pitch{margin:0 0 20px}
+  .key{display:flex;flex-wrap:wrap;gap:16px;margin:0 0 26px}
+  .key > span{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--dim)}
+  .key .cell{width:24px;height:16px}
+
+  .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+  @keyframes settle{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
+  .log li{animation:settle .22s ease-out}
+
+  @media (prefers-reduced-motion:reduce){
+    *{animation:none !important;transition:none !important}
+  }
+
+  @media (max-width:400px){
+    .stage{height:158px}
+    .chip{padding:6px 7px;font-size:12px}
+    .log li{grid-template-columns:22px repeat(3,1fr);gap:6px}
+  }
+</style>
+</head>
+<body>
+<main class="app">
+
+  <header>
+    <h1 class="wordmark">Hueristic</h1>
+    <div class="meta" id="meta">
+      <span id="puzzleNo">No. 1</span>
+      <button class="mode" id="boardBtn" type="button" hidden>Board</button>
+      <button class="mode" id="statsBtn" type="button">Stats</button>
+      <button class="mode" id="helpBtn" type="button">How to play</button>
+    </div>
+  </header>
+
+  <div id="game">
+
+  <div class="stage" id="stage">
+    <div class="face" id="faceGuess"><span class="face-tag">Your guess</span></div>
+  </div>
+
+  <div class="controls">
+    <div class="row">
+      <label for="h">H</label>
+      <input type="range" id="h" min="0" max="359" value="180" aria-describedby="hv">
+      <output id="hv" for="h">180</output>
+    </div>
+    <div class="row">
+      <label for="s">S</label>
+      <input type="range" id="s" min="0" max="100" value="50" aria-describedby="sv">
+      <output id="sv" for="s">50</output>
+    </div>
+    <div class="row">
+      <label for="l">L</label>
+      <input type="range" id="l" min="0" max="100" value="50" aria-describedby="lv">
+      <output id="lv" for="l">50</output>
+    </div>
+  </div>
+
+  <div class="actions">
+    <button class="btn" id="checkBtn" type="button">Check color</button>
+    <div class="status">
+      <span class="round" id="round" hidden>Round 2</span>
+      <span class="tries" id="tries">6 tries left</span>
+    </div>
+  </div>
+
+  <div class="verdict" id="verdict" hidden>
+    <p id="verdictText"></p>
+    <div class="buttons">
+      <button class="btn" id="againBtn" type="button">Next color</button>
+      <button class="btn ghost" id="shareBtn" type="button">Copy today's results</button>
+    </div>
+    <div class="fallback" id="fallback" hidden>
+      <p>This browser blocked the clipboard. Select the text below and copy it.</p>
+      <textarea id="fallbackText" rows="3" readonly
+                aria-label="Your results, ready to copy"></textarea>
+    </div>
+
+    <div class="verdict-board" id="verdictBoard" hidden>
+      <p id="verdictBoardText"></p>
+      <div class="join-row" id="verdictJoinRow" hidden>
+        <input id="verdictName" type="text" maxlength="20" autocomplete="nickname"
+               placeholder="Your name">
+        <button class="btn" id="verdictJoinBtn" type="button">Join</button>
+      </div>
+    </div>
+  </div>
+
+  <ul class="log" id="log" aria-label="Previous guesses"></ul>
+
+  <p class="hint" id="hint">
+    Arrows point toward the answer. A solid chip means that slider is matched.
+  </p>
+
+  <section class="today" id="today" hidden>
+    <h2>Today's rounds</h2>
+    <ol class="rounds" id="rounds"></ol>
+    <p class="summary" id="summary"></p>
+  </section>
+
+  </div><!-- /#game -->
+
+  <section class="shared" id="shared" hidden>
+    <img class="hero" src="og.png" width="1200" height="630"
+         alt="A blue swatch above a hue slider, beside the word Hueristic.">
+
+    <h2 id="sharedTitle"></h2>
+    <p id="sharedNote"></p>
+    <p class="pitch">Each round hides a color. You get six tries to match it,
+    using a hue, a saturation and a lightness slider.</p>
+
+    <div class="key">
+      <span><span class="cell lock"></span>matched</span>
+      <span><span class="cell near"></span>close</span>
+      <span><span class="cell far"></span>far off</span>
+    </div>
+
+    <div class="results" id="sharedResults"></div>
+    <button class="btn" id="playBtn" type="button">Play today's colors</button>
+  </section>
+
+  <p class="sr" role="status" aria-live="polite" id="live"></p>
+
+  <dialog id="help" aria-labelledby="helpTitle">
+    <button class="close" id="helpX" type="button" aria-label="Close instructions">
+      <svg viewBox="0 0 14 14" aria-hidden="true" focusable="false">
+        <path d="M1 1 L13 13 M13 1 L1 13" fill="none" stroke="currentColor"
+              stroke-width="1.6" stroke-linecap="round"/>
+      </svg>
+    </button>
+
+    <h2 id="helpTitle">How to play</h2>
+
+    <p>A color is hidden. Match it in six tries.</p>
+
+    <p>Drag the three sliders to mix a color. H is hue, the color itself. S is
+    saturation, grey through to vivid. L is lightness, black through to white.</p>
+
+    <p>Each try scores the three sliders separately:</p>
+
+    <ul class="legend">
+      <li>
+        <div class="chip lock"><span class="k">H 212</span><span class="arrow">✓</span></div>
+        <p>Matched. Leave this slider alone.</p>
+      </li>
+      <li>
+        <div class="chip near"><span class="k">S 64</span><span class="arrow">↑</span></div>
+        <p>Close. Nudge it higher.</p>
+      </li>
+      <li>
+        <div class="chip far"><span class="k">L 20</span><span class="arrow">↓</span></div>
+        <p>Way off. Drag it a long way down.</p>
+      </li>
+    </ul>
+
+    <p>The arrow always points toward the answer. You win when all three are
+    matched on the same try.</p>
+
+    <p>Finish a round and another color is waiting. Play as many as you like.
+    Everyone gets the same colors in the same order each day, so scores compare.
+    The number beside the title is today's puzzle, counting up one a day.</p>
+
+    <p id="helpBoard" hidden>Your first round each day can go on a shared
+    board, so you can see how everyone else got on with the same colors.</p>
+
+    <button class="btn" id="helpClose" type="button">Start playing</button>
+  </dialog>
+
+  <dialog id="stats" aria-labelledby="statsTitle">
+    <button class="close" id="statsX" type="button" aria-label="Close stats">
+      <svg viewBox="0 0 14 14" aria-hidden="true" focusable="false">
+        <path d="M1 1 L13 13 M13 1 L1 13" fill="none" stroke="currentColor"
+              stroke-width="1.6" stroke-linecap="round"/>
+      </svg>
+    </button>
+
+    <h2 id="statsTitle">Your record</h2>
+
+    <p class="stat-empty" id="statsEmpty" hidden>Nothing here yet. Finish a round
+    and this fills in.</p>
+
+    <div id="statsBody">
+      <div class="tallies" id="tallies"></div>
+
+      <h3 class="stat-label">Tries taken to match</h3>
+      <div class="dist" id="dist"></div>
+
+      <h3 class="stat-label">Tries taken to lock each slider</h3>
+      <div class="dist" id="chan"></div>
+
+      <p class="stat-note" id="statsNote"></p>
+    </div>
+
+    <button class="btn" id="statsClose" type="button">Back to the game</button>
+  </dialog>
+
+  <dialog id="board" aria-labelledby="boardTitle">
+    <button class="close" id="boardX" type="button" aria-label="Close the board">
+      <svg viewBox="0 0 14 14" aria-hidden="true" focusable="false">
+        <path d="M1 1 L13 13 M13 1 L1 13" fill="none" stroke="currentColor"
+              stroke-width="1.6" stroke-linecap="round"/>
+      </svg>
+    </button>
+
+    <h2 id="boardTitle">Today's board</h2>
+
+    <p class="stat-empty" id="boardState">Loading today's board…</p>
+
+    <div id="boardBody" hidden>
+      <p class="board-you" id="boardYou"></p>
+      <h3 class="stat-label">How everyone did on their first round</h3>
+      <div class="dist" id="boardDist"></div>
+      <h3 class="stat-label">Fastest today</h3>
+      <ol class="board-list" id="boardList"></ol>
+    </div>
+
+    <div id="boardJoin" hidden>
+      <label class="stat-label" for="boardName">Add a name to take a place</label>
+      <div class="join-row">
+        <input id="boardName" type="text" maxlength="20" autocomplete="nickname"
+               placeholder="Your name">
+        <button class="btn" id="boardJoinBtn" type="button">Join</button>
+      </div>
+      <p class="stat-note">Your name and your first-round score for the day
+      are public and can't be edited afterwards. Only the first round counts —
+      later rounds are practice.</p>
+    </div>
+
+    <p class="board-who" id="boardWho" hidden></p>
+
+    <button class="btn ghost" id="boardClose" type="button">Back to the game</button>
+  </dialog>
+
+</main>
+
+<script>
+(function () {
+  'use strict';
+
+  // How close each channel has to be. Hue gets more room because 360 degrees
+  // cannot be halved into single digits inside six guesses.
+  var TOL   = { h: 8,  s: 5,  l: 5  };
+  var CLOSE = { h: 30, s: 14, l: 14 };
+  var MAX_TRIES = 6;
+
+  // Puzzle numbering starts here. Set this to the day you publish, otherwise
+  // the counter claims a run of puzzles that nobody ever played.
+  var LAUNCH = Date.UTC(2026, 7, 31); // 31 August 2026
+
+  // Share links point at wherever this file is actually served from, so there
+  // is nothing to update when you move it. The fallback only matters when the
+  // page is opened straight off disk — set it to your real address.
+  var SITE = (location.protocol === 'https:' || location.protocol === 'http:')
+    ? location.origin + location.pathname.replace(/index\.html$/, '')
+    : 'https://eaustine.github.io/hueristic/';
+
+  /* ---------- storage ----------
+     This file runs in an embedded preview and, later, on your own domain, and
+     those don't offer the same APIs. Try the host's storage, fall back to
+     localStorage for a self-hosted copy, fall back to memory so a private or
+     locked-down browser still plays — it just forgets. Every path returns a
+     promise so the rest of the game only deals with one interface. */
+  var Store = (function () {
+    var KEY = 'hueristic:v1';
+
+    var host = (window.storage && typeof window.storage.get === 'function') ? window.storage : null;
+    if (host) {
+      return {
+        label: 'host',
+        load: function () {
+          return host.get(KEY).then(function (r) {
+            return r && r.value ? JSON.parse(r.value) : null;
+          })['catch'](function () { return null; });
+        },
+        save: function (data) {
+          return host.set(KEY, JSON.stringify(data))['catch'](function () {});
+        }
+      };
+    }
+
+    var local = null;
+    try {
+      var probe = '__hueristic__';
+      window.localStorage.setItem(probe, '1');
+      window.localStorage.removeItem(probe);
+      local = window.localStorage;
+    } catch (e) { local = null; }
+
+    if (local) {
+      return {
+        label: 'local',
+        load: function () {
+          var out = null;
+          try { var raw = local.getItem(KEY); if (raw) out = JSON.parse(raw); } catch (e) { out = null; }
+          return Promise.resolve(out);
+        },
+        save: function (data) {
+          try { local.setItem(KEY, JSON.stringify(data)); } catch (e) {}
+          return Promise.resolve();
+        }
+      };
+    }
+
+    var mem = null;
+    return {
+      label: 'memory',
+      load: function () { return Promise.resolve(mem); },
+      save: function (d) { mem = d; return Promise.resolve(); }
+    };
+  })();
+
+  var el = {
+    stage: document.getElementById('stage'),
+    faceGuess: document.getElementById('faceGuess'),
+    h: document.getElementById('h'),
+    s: document.getElementById('s'),
+    l: document.getElementById('l'),
+    hv: document.getElementById('hv'),
+    sv: document.getElementById('sv'),
+    lv: document.getElementById('lv'),
+    check: document.getElementById('checkBtn'),
+    tries: document.getElementById('tries'),
+    verdict: document.getElementById('verdict'),
+    verdictText: document.getElementById('verdictText'),
+    share: document.getElementById('shareBtn'),
+    fallback: document.getElementById('fallback'),
+    fallbackText: document.getElementById('fallbackText'),
+    again: document.getElementById('againBtn'),
+    log: document.getElementById('log'),
+    hint: document.getElementById('hint'),
+    live: document.getElementById('live'),
+    round: document.getElementById('round'),
+    today: document.getElementById('today'),
+    rounds: document.getElementById('rounds'),
+    summary: document.getElementById('summary'),
+    puzzleNo: document.getElementById('puzzleNo'),
+    meta: document.getElementById('meta'),
+    game: document.getElementById('game'),
+    shared: document.getElementById('shared'),
+    sharedTitle: document.getElementById('sharedTitle'),
+    sharedNote: document.getElementById('sharedNote'),
+    sharedResults: document.getElementById('sharedResults'),
+    play: document.getElementById('playBtn'),
+    help: document.getElementById('help'),
+    helpBtn: document.getElementById('helpBtn'),
+    helpClose: document.getElementById('helpClose'),
+    helpX: document.getElementById('helpX'),
+    stats: document.getElementById('stats'),
+    statsBtn: document.getElementById('statsBtn'),
+    statsClose: document.getElementById('statsClose'),
+    statsX: document.getElementById('statsX'),
+    tallies: document.getElementById('tallies'),
+    dist: document.getElementById('dist'),
+    chan: document.getElementById('chan'),
+    statsBody: document.getElementById('statsBody'),
+    statsEmpty: document.getElementById('statsEmpty'),
+    statsNote: document.getElementById('statsNote'),
+    board: document.getElementById('board'),
+    boardBtn: document.getElementById('boardBtn'),
+    boardX: document.getElementById('boardX'),
+    boardClose: document.getElementById('boardClose'),
+    boardState: document.getElementById('boardState'),
+    boardBody: document.getElementById('boardBody'),
+    boardYou: document.getElementById('boardYou'),
+    boardDist: document.getElementById('boardDist'),
+    boardList: document.getElementById('boardList'),
+    boardJoin: document.getElementById('boardJoin'),
+    boardName: document.getElementById('boardName'),
+    boardJoinBtn: document.getElementById('boardJoinBtn'),
+    boardWho: document.getElementById('boardWho'),
+    helpBoard: document.getElementById('helpBoard'),
+    verdictBoard: document.getElementById('verdictBoard'),
+    verdictBoardText: document.getElementById('verdictBoardText'),
+    verdictJoinRow: document.getElementById('verdictJoinRow'),
+    verdictName: document.getElementById('verdictName'),
+    verdictJoinBtn: document.getElementById('verdictJoinBtn')
+  };
+
+  function openHelp() {
+    if (typeof el.help.showModal === 'function') el.help.showModal();
+    else el.help.setAttribute('open', '');
+  }
+  function closeHelp() {
+    if (typeof el.help.close === 'function') el.help.close();
+    else el.help.removeAttribute('open');
+    el.check.focus();
+    if (!state.seenHelp) { state.seenHelp = true; persist(); }
+  }
+
+  var state = {
+    day: 0,
+    round: 1,
+    target: null,
+    guesses: [],
+    history: [],
+    over: false,
+    seenHelp: false,
+    clientId: '',
+    name: '',
+    firstResult: 0,   // round one's score for the day: 1-6 matched, 7 missed
+    posted: false,
+    // Survives the daily reset. Everything else in the save is thrown away
+    // when the date rolls over; this is the part that accumulates.
+    //   chan   — tries taken to first lock each slider, summed, with a count
+    //            of the rounds it locked in at all
+    //   recent — the last 20 round scores, 0 for a miss, for the trend line
+    record: {
+      played: 0, won: 0, dist: [0, 0, 0, 0, 0, 0], days: 0, lastDay: -1,
+      chan: { h: [0, 0], s: [0, 0], l: [0, 0] },
+      recent: []
+    }
+  };
+
+  /* ---------- leaderboard ----------
+     Fill these in from Supabase: Project Settings → API. The anon key is
+     designed to be public and shipped in client code; the rules that protect
+     the data live in the database, not here. Never paste the service_role key
+     into this file — it bypasses every one of them.
+
+     Left blank, the board switches itself off and the game is unchanged. */
+  var BOARD = {
+    url: 'https://tmaukbgdkkqcbwqgrmje.supabase.co',
+    key: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRtYXVrYmdka2txY2J3cWdybWplIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgxOTEwMDksImV4cCI6MjEwMzc2NzAwOX0.bHY8hNm35EtsDxSIibm8c06jxGX-oS_5UEAZN1XzDSc'
+  };
+
+  var boardOn = !!(BOARD.url && BOARD.key);
+
+  // Reads the role out of a legacy JWT key without verifying it — this is a
+  // guard against a footgun, not a security check.
+  function keyRole(key) {
+    try {
+      var payload = key.split('.')[1];
+      if (!payload) return '';
+      return JSON.parse(atob(payload.replace(/-/g, '+').replace(/_/g, '/'))).role || '';
+    } catch (e) {
+      return '';
+    }
+  }
+
+  // A secret key in a web page bypasses every policy in the database. Better
+  // to switch the board off and say so than to quietly publish it.
+  if (boardOn && (/^sb_secret_/.test(BOARD.key) || keyRole(BOARD.key) === 'service_role')) {
+    boardOn = false;
+    if (window.console && console.error) {
+      console.error('Hueristic: that is a Supabase secret key, not the publishable one. ' +
+                    'The board is off. Replace it and rotate the key you pasted.');
+    }
+  }
+
+  function boardHeaders() {
+    var h = {
+      'apikey': BOARD.key,
+      'Content-Type': 'application/json'
+    };
+    // Legacy anon keys are JWTs and want a bearer header as well. The newer
+    // sb_publishable_ keys are rejected if sent that way, so only add it when
+    // the key actually is a JWT.
+    if (BOARD.key.slice(0, 3) === 'eyJ') {
+      h['Authorization'] = 'Bearer ' + BOARD.key;
+    }
+    return h;
+  }
+
+  function uuid() {
+    if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+      var r = Math.random() * 16 | 0;
+      return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+    });
+  }
+
+
+  var CHAN_NAME = { h: 'Hue', s: 'Saturation', l: 'Lightness' };
+
+  function blankChan() {
+    return { h: [0, 0], s: [0, 0], l: [0, 0] };
+  }
+
+  function safeChan(c) {
+    var out = blankChan();
+    if (!c) return out;
+    ['h', 's', 'l'].forEach(function (k) {
+      if (c[k] && c[k].length === 2 &&
+          typeof c[k][0] === 'number' && typeof c[k][1] === 'number') {
+        out[k] = [c[k][0], c[k][1]];
+      }
+    });
+    return out;
+  }
+
+  function persist() {
+    Store.save({
+      v: 2,
+      day: state.day,
+      round: state.round,
+      done: state.over,
+      seenHelp: state.seenHelp,
+      record: state.record,
+      clientId: state.clientId,
+      name: state.name,
+      firstResult: state.firstResult,
+      posted: state.posted,
+      // Only raw slider values are stored. Targets come back from colorFor()
+      // and scores are re-derived, so a change to the tolerances can never
+      // leave saved rounds contradicting the current rules.
+      pending: state.guesses.map(function (g) { return g.guess; }),
+      history: state.history.map(function (r) {
+        return { round: r.round, won: r.won, tries: r.tries, guesses: r.guesses };
+      })
+    });
+  }
+
+  /* ---------- colour maths ---------- */
+
+  function hsl(c) {
+    return 'hsl(' + c.h + ' ' + c.s + '% ' + c.l + '%)';
+  }
+
+  function toHex(c) {
+    var s = c.s / 100, l = c.l / 100;
+    var k = function (n) { return (n + c.h / 30) % 12; };
+    var a = s * Math.min(l, 1 - l);
+    var f = function (n) {
+      return l - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)));
+    };
+    var hx = function (v) {
+      return Math.round(v * 255).toString(16).padStart(2, '0');
+    };
+    return '#' + hx(f(0)) + hx(f(8)) + hx(f(4));
+  }
+
+  // Hue wraps, so the useful delta is the shortest way round the wheel.
+  function hueDelta(target, guess) {
+    return ((target - guess + 540) % 360) - 180;
+  }
+
+  /* ---------- puzzle selection ---------- */
+
+  function mulberry32(a) {
+    return function () {
+      a |= 0; a = a + 0x6D2B79F5 | 0;
+      var t = Math.imul(a ^ a >>> 15, 1 | a);
+      t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+      return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    };
+  }
+
+  function dayIndex() {
+    var n = new Date();
+    return Math.floor((Date.UTC(n.getFullYear(), n.getMonth(), n.getDate()) - LAUNCH) / 86400000);
+  }
+
+  // Saturation and lightness are clamped away from the extremes. Near-grey or
+  // near-black targets make hue impossible to read, which is unfair rather than hard.
+  function pick(rand) {
+    return {
+      h: Math.floor(rand() * 360),
+      s: 25 + Math.floor(rand() * 68),
+      l: 22 + Math.floor(rand() * 58)
+    };
+  }
+
+  // Each day is a sequence, not a single color. Round 3 on the 14th is the same
+  // color for everyone, so unlimited replays stay comparable between players.
+  function colorFor(day, round) {
+    var r = mulberry32((day * 2654435761 + round * 40503) % 2147483647);
+    r(); r(); // discard the first pulls, they correlate across nearby seeds
+    return pick(r);
+  }
+
+  /* ---------- rendering ---------- */
+
+  function current() {
+    return { h: +el.h.value, s: +el.s.value, l: +el.l.value };
+  }
+
+  function paint() {
+    var c = current();
+
+    el.faceGuess.style.background = hsl(c);
+    el.hv.textContent = c.h;
+    el.sv.textContent = c.s;
+    el.lv.textContent = c.l;
+
+    // Every track shows the real ramp for its channel at the other two values,
+    // so the control demonstrates what it does while you drag it.
+    var hueStops = [];
+    for (var d = 0; d <= 360; d += 30) {
+      hueStops.push('hsl(' + d + ' ' + c.s + '% ' + c.l + '%)');
+    }
+    el.h.style.setProperty('--track', 'linear-gradient(90deg,' + hueStops.join(',') + ')');
+    el.s.style.setProperty('--track',
+      'linear-gradient(90deg, hsl(' + c.h + ' 0% ' + c.l + '%), hsl(' + c.h + ' 100% ' + c.l + '%))');
+    el.l.style.setProperty('--track',
+      'linear-gradient(90deg, #000, hsl(' + c.h + ' ' + c.s + '% 50%), #fff)');
+  }
+
+  function grade(guess, target) {
+    var d = {
+      h: hueDelta(target.h, guess.h),
+      s: target.s - guess.s,
+      l: target.l - guess.l
+    };
+    return ['h', 's', 'l'].map(function (k) {
+      var mag = Math.abs(d[k]);
+      return {
+        key: k,
+        value: guess[k],
+        state: mag <= TOL[k] ? 'lock' : (mag <= CLOSE[k] ? 'near' : 'far'),
+        up: d[k] > 0
+      };
+    });
+  }
+
+  function addRow(guess, marks) {
+    var li = document.createElement('li');
+
+    var sw = document.createElement('div');
+    sw.className = 'chip-swatch';
+    sw.style.background = hsl(guess);
+    li.appendChild(sw);
+
+    marks.forEach(function (m) {
+      var chip = document.createElement('div');
+      chip.className = 'chip ' + m.state;
+
+      var k = document.createElement('span');
+      k.className = 'k';
+      k.textContent = m.key.toUpperCase() + ' ' + m.value;
+
+      var a = document.createElement('span');
+      a.className = 'arrow';
+      a.textContent = m.state === 'lock' ? '✓' : (m.up ? '↑' : '↓');
+
+      chip.appendChild(k);
+      chip.appendChild(a);
+      li.appendChild(chip);
+    });
+
+    el.log.insertBefore(li, el.log.firstChild);
+  }
+
+  function say(marks, won) {
+    if (won) { el.live.textContent = 'Matched.'; return; }
+    var names = { h: 'hue', s: 'saturation', l: 'lightness' };
+    el.live.textContent = marks.map(function (m) {
+      if (m.state === 'lock') return names[m.key] + ' matched';
+      return names[m.key] + ' ' + (m.up ? 'higher' : 'lower') + ', ' + m.state;
+    }).join('. ');
+  }
+
+  /* ---------- end of round ---------- */
+
+  function renderHistory() {
+    el.today.hidden = state.history.length === 0;
+    el.rounds.innerHTML = '';
+
+    state.history.forEach(function (r) {
+      var li = document.createElement('li');
+
+      var sw = document.createElement('span');
+      sw.className = 'sw';
+      sw.style.background = hsl(r.target);
+
+      var n = document.createElement('span');
+      n.className = 'n';
+      n.textContent = 'Round ' + r.round + ', ' + hsl(r.target);
+
+      var sc = document.createElement('span');
+      sc.className = 'score' + (r.won ? '' : ' miss');
+      sc.textContent = r.won ? r.tries + '/' + MAX_TRIES : 'Missed';
+
+      li.appendChild(sw);
+      li.appendChild(n);
+      li.appendChild(sc);
+      el.rounds.appendChild(li);
+    });
+
+    var wins = state.history.filter(function (r) { return r.won; }).length;
+    el.summary.textContent = wins + ' of ' + state.history.length +
+      ' matched' + (state.history.length === 1 ? '' : ' today') + '.';
+  }
+
+  function reveal(won) {
+    state.over = true;
+    el.check.disabled = true;
+    el.tries.textContent = 'Round over';
+    el.verdict.hidden = false;
+    el.hint.hidden = true;
+
+    var answer = document.createElement('div');
+    answer.className = 'face';
+    answer.style.background = hsl(state.target);
+    var tag = document.createElement('span');
+    tag.className = 'face-tag';
+    tag.textContent = toHex(state.target);
+    answer.appendChild(tag);
+    el.stage.appendChild(answer);
+    el.stage.classList.add('revealed');
+
+    var n = state.guesses.length;
+    el.verdictText.innerHTML = won
+      ? 'Matched in ' + n + (n === 1 ? ' try' : ' tries') + '. The answer was <span class="answer">' +
+        hsl(state.target) + '</span>.'
+      : 'Out of tries. The answer was <span class="answer">' + hsl(state.target) + '</span>.';
+
+    [el.h, el.s, el.l].forEach(function (i) { i.disabled = true; });
+
+    state.record.played += 1;
+    if (won) {
+      state.record.won += 1;
+      state.record.dist[n - 1] += 1;
+    }
+
+    // Which try did each slider first land on? This is the number that tells
+    // a player what to practise — a win in four says nothing about whether
+    // saturation or hue was the thing holding them up.
+    var seen = {};
+    state.guesses.forEach(function (g, i) {
+      g.marks.forEach(function (m) {
+        if (m.state === 'lock' && !seen[m.key]) {
+          seen[m.key] = true;
+          state.record.chan[m.key][0] += i + 1;
+          state.record.chan[m.key][1] += 1;
+        }
+      });
+    });
+
+    state.record.recent.push(won ? n : 0);
+    if (state.record.recent.length > 20) state.record.recent.shift();
+
+    // Only the first round of the day goes to the board. With unlimited
+    // replays, "best of the day" would just reward whoever ground out the
+    // most attempts until one came up lucky.
+    if (state.round === 1) {
+      state.firstResult = won ? n : 7;
+    }
+    updateVerdictBoard();
+
+    state.history.push({
+      round: state.round,
+      target: state.target,
+      won: won,
+      tries: n,
+      guesses: state.guesses.map(function (g) { return g.guess; }),
+      marks: state.guesses.map(function (g) { return g.marks; })
+    });
+    renderHistory();
+    persist();
+  }
+
+  function postScore() {
+    if (!boardOn || !state.name || state.posted || !state.firstResult) {
+      return Promise.resolve(false);
+    }
+
+    return fetch(BOARD.url + '/rest/v1/scores', {
+      method: 'POST',
+      headers: boardHeaders(),
+      body: JSON.stringify({
+        day: state.day,
+        client_id: state.clientId,
+        name: state.name,
+        tries: state.firstResult
+      })
+    }).then(function (res) {
+      // 409 means the unique key rejected a second score for today, which is
+      // the rule working. Either way there is nothing left to send.
+      if (res.ok || res.status === 409) {
+        state.posted = true;
+        persist();
+        return true;
+      }
+      return false;
+    })['catch'](function () { return false; });
+  }
+
+  function fetchBoard() {
+    var q = '/rest/v1/leaderboard?select=name,tries,created_at' +
+            '&day=eq.' + state.day +
+            '&order=tries.asc,created_at.asc&limit=500';
+    return fetch(BOARD.url + q, { headers: boardHeaders() }).then(function (res) {
+      if (!res.ok) throw new Error('board unavailable');
+      return res.json();
+    });
+  }
+
+  function renderBoard(rows) {
+    var total = rows.length;
+
+    // distribution across the seven outcomes, 7 being a miss
+    var buckets = [0, 0, 0, 0, 0, 0, 0];
+    rows.forEach(function (row) {
+      if (row.tries >= 1 && row.tries <= 7) buckets[row.tries - 1] += 1;
+    });
+
+    var mine = state.firstResult;
+    var peak = Math.max.apply(null, buckets.concat([1]));
+
+    el.boardDist.innerHTML = '';
+    buckets.forEach(function (count, i) {
+      var label = i === 6 ? '✗' : i + 1;
+      var row = document.createElement('div');
+      row.className = 'bar' + (mine === i + 1 ? ' you' : '');
+      var t = document.createElement('span');
+      t.className = 't';
+      t.textContent = label;
+      var fill = document.createElement('span');
+      fill.className = 'fill' + (count ? ' on' : '');
+      fill.style.width = Math.round(count / peak * 100) + '%';
+      fill.textContent = count;
+      row.appendChild(t);
+      row.appendChild(fill);
+      el.boardDist.appendChild(row);
+    });
+
+    if (mine && total) {
+      var behind = rows.filter(function (row) { return row.tries > mine; }).length;
+      var pct = Math.round(behind / total * 100);
+      el.boardYou.textContent = mine === 7
+        ? 'You missed today\'s first color. ' + total + ' have played.'
+        : 'You matched in ' + mine + ', ahead of ' + pct + '% of today\'s ' + total + ' players.';
+    } else if (mine) {
+      el.boardYou.textContent = 'You matched in ' + mine + '. Nobody else has played yet.';
+    } else {
+      el.boardYou.textContent = 'Finish your first round to take a place on the board.';
+    }
+
+    el.boardList.innerHTML = '';
+    rows.slice(0, 10).forEach(function (row, i) {
+      var li = document.createElement('li');
+      var pos = document.createElement('span');
+      pos.className = 'pos';
+      pos.textContent = i + 1;
+      var nm = document.createElement('span');
+      nm.className = 'nm';
+      nm.textContent = row.name;
+      var sc = document.createElement('span');
+      sc.className = 'score' + (row.tries === 7 ? ' miss' : '');
+      sc.textContent = row.tries === 7 ? 'Missed' : row.tries + '/' + MAX_TRIES;
+      li.appendChild(pos);
+      li.appendChild(nm);
+      li.appendChild(sc);
+      el.boardList.appendChild(li);
+    });
+
+    var joined = !!state.name;
+    el.boardJoin.hidden = joined;
+    el.boardWho.hidden = !joined;
+    if (joined) {
+      el.boardWho.textContent = state.posted
+        ? 'Playing as ' + state.name + '. Your score is in.'
+        : (state.firstResult
+            ? 'Playing as ' + state.name + '. Your score hasn\'t sent yet — reopen the board to retry.'
+            : 'Playing as ' + state.name + '. Finish today\'s first round to appear here.');
+    }
+    el.boardBody.hidden = false;
+    el.boardState.hidden = true;
+  }
+
+  function openBoard() {
+    el.boardBody.hidden = true;
+    el.boardJoin.hidden = true;
+    el.boardWho.hidden = true;
+    el.boardState.hidden = false;
+    el.boardState.textContent = 'Loading today\'s board…';
+
+    if (typeof el.board.showModal === 'function') el.board.showModal();
+    else el.board.setAttribute('open', '');
+
+    // Send anything still pending before reading, so a score that failed
+    // earlier gets another chance every time the board is opened.
+    postScore()
+      .then(fetchBoard)
+      .then(renderBoard)['catch'](function () {
+        el.boardState.textContent =
+          'Couldn\'t reach the board just now. Your rounds are safe either way.';
+        el.boardJoin.hidden = !!state.name;
+      });
+  }
+
+  function closeBoard() {
+    if (typeof el.board.close === 'function') el.board.close();
+    else el.board.removeAttribute('open');
+  }
+
+  function cleanName(value) {
+    return String(value).replace(/\s+/g, ' ').trim().slice(0, 20);
+  }
+
+  // Shown in the results panel, where the ask actually means something: the
+  // player has a score in front of them and a reason to want it compared.
+  // Asking on first load would put a form in front of someone who has not
+  // played yet and does not know what the board is for.
+  function updateVerdictBoard() {
+    if (!boardOn || !state.firstResult) { el.verdictBoard.hidden = true; return; }
+    // After round one it always reports. Later rounds only nudge if the score
+    // still hasn't gone anywhere.
+    if (state.posted && state.round !== 1) { el.verdictBoard.hidden = true; return; }
+
+    el.verdictBoard.hidden = false;
+
+    if (!state.name) {
+      el.verdictJoinRow.hidden = false;
+      el.verdictBoardText.textContent =
+        'Add a name to put this score on today\'s board. Your first round is the one that counts.';
+      return;
+    }
+
+    el.verdictJoinRow.hidden = true;
+    if (state.posted) {
+      el.verdictBoardText.textContent =
+        'Your score is on today\'s board as ' + state.name + '.';
+      return;
+    }
+
+    el.verdictBoardText.textContent = 'Sending your score to the board…';
+    postScore().then(function (ok) {
+      el.verdictBoardText.textContent = ok
+        ? 'Your score is on today\'s board as ' + state.name + '.'
+        : 'Couldn\'t reach the board. Open Board to try again.';
+    });
+  }
+
+  function joinFromVerdict() {
+    var name = cleanName(el.verdictName.value);
+    if (!name) { el.verdictName.focus(); return; }
+    state.name = name;
+    persist();
+    updateVerdictBoard();
+  }
+
+  function joinBoard() {
+    var name = cleanName(el.boardName.value);
+    if (!name) { el.boardName.focus(); return; }
+
+    state.name = name;
+    persist();
+
+    el.boardJoin.hidden = true;
+    el.boardWho.hidden = false;
+
+    if (!state.firstResult) {
+      el.boardWho.textContent =
+        'Playing as ' + name + '. Finish today\'s first round to appear here.';
+      return;
+    }
+
+    el.boardWho.textContent = 'Playing as ' + name + '. Sending…';
+    postScore().then(function (ok) {
+      if (!ok) {
+        el.boardWho.textContent =
+          'Playing as ' + name + '. Your score didn\'t send — reopen the board to retry.';
+        return;
+      }
+      return fetchBoard().then(renderBoard);
+    })['catch'](function () {});
+  }
+
+  function bar(host, label, width, text, filled) {
+    var row = document.createElement('div');
+    row.className = 'bar';
+    var t = document.createElement('span');
+    t.className = 't';
+    t.textContent = label;
+    var fill = document.createElement('span');
+    fill.className = 'fill' + (filled ? ' on' : '');
+    fill.style.width = Math.round(width * 100) + '%';
+    fill.textContent = text;
+    row.appendChild(t);
+    row.appendChild(fill);
+    host.appendChild(row);
+  }
+
+  function renderStats() {
+    var r = state.record;
+
+    el.statsEmpty.hidden = r.played > 0;
+    el.statsBody.hidden = r.played === 0;
+    if (!r.played) return;
+
+    var rate = Math.round(r.won / r.played * 100);
+    el.tallies.innerHTML = '';
+    [['Rounds', r.played], ['Matched', r.won], ['Win rate', rate + '%']]
+      .forEach(function (pair) {
+        var box = document.createElement('div');
+        var v = document.createElement('span');
+        v.className = 'v';
+        v.textContent = pair[1];
+        var k = document.createElement('span');
+        k.className = 'k';
+        k.textContent = pair[0];
+        box.appendChild(v);
+        box.appendChild(k);
+        el.tallies.appendChild(box);
+      });
+
+    // Misses belong on this chart. Leaving them off flatters the player and
+    // hides the shape of how they actually lose.
+    var missed = r.played - r.won;
+    var peak = Math.max.apply(null, r.dist.concat([missed, 1]));
+    el.dist.innerHTML = '';
+    r.dist.forEach(function (count, i) {
+      bar(el.dist, i + 1, count / peak, count, count > 0);
+    });
+    bar(el.dist, '✗', missed / peak, missed, false);
+
+    // Average try on which each slider first landed.
+    var avg = {};
+    ['h', 's', 'l'].forEach(function (k) {
+      avg[k] = r.chan[k][1] ? r.chan[k][0] / r.chan[k][1] : null;
+    });
+    var slowest = Math.max.apply(null, ['h', 's', 'l'].map(function (k) {
+      return avg[k] === null ? 0 : avg[k];
+    }).concat([1]));
+
+    el.chan.innerHTML = '';
+    ['h', 's', 'l'].forEach(function (k) {
+      if (avg[k] === null) {
+        bar(el.chan, k.toUpperCase(), 0, '—', false);
+      } else {
+        bar(el.chan, k.toUpperCase(), avg[k] / slowest, avg[k].toFixed(1), true);
+      }
+    });
+
+    var notes = [];
+    var ranked = ['h', 's', 'l'].filter(function (k) { return avg[k] !== null; })
+      .sort(function (a, b) { return avg[a] - avg[b]; });
+
+    // Only worth calling out once there is enough data for the gap to mean
+    // something, and only when the gap is actually wide.
+    if (ranked.length === 3 && r.played >= 5) {
+      var best = ranked[0], worst = ranked[2];
+      if (avg[worst] - avg[best] >= 0.5) {
+        notes.push(CHAN_NAME[best] + ' comes to you fastest. ' +
+                   CHAN_NAME[worst] + ' costs you about ' +
+                   (avg[worst] - avg[best]).toFixed(1) + ' more tries.');
+      } else {
+        notes.push('All three sliders are landing at about the same rate.');
+      }
+    }
+
+    if (r.recent.length >= 6) {
+      var wins = r.recent.filter(function (n) { return n > 0; });
+      if (wins.length >= 3) {
+        var recentAvg = wins.reduce(function (a, b) { return a + b; }, 0) / wins.length;
+        notes.push('Your last ' + wins.length + ' matches averaged ' +
+                   recentAvg.toFixed(1) + ' tries.');
+      }
+    }
+
+    if (r.days > 1) notes.push('Played on ' + r.days + ' days.');
+
+    el.statsNote.textContent = notes.join(' ');
+  }
+
+  /* ---------- sharing ----------
+     A guess scores three channels, each in one of three states, so a whole
+     guess fits in one of 27 symbols. Six guesses cost six characters. Only the
+     scores travel — never the guesses, never the answer — so a link posted
+     mid-morning gives nothing away to someone who hasn't played. */
+  var ALPHA = '0123456789abcdefghijklmnopq';
+  var RANK = { far: 0, near: 1, lock: 2 };
+
+  function encodeResult() {
+    return state.day + '-' + state.history.map(function (r) {
+      return r.marks.map(function (marks) {
+        var v = 0;
+        marks.forEach(function (m) { v = v * 3 + RANK[m.state]; });
+        return ALPHA.charAt(v);
+      }).join('');
+    }).join('.');
+  }
+
+  function decodeResult(raw) {
+    var parts = String(raw).split('-');
+    var day = parseInt(parts[0], 10);
+    // A hand-edited link shouldn't be able to render "No. 1000000000".
+    if (isNaN(day) || day < 0 || day > 36500 || !parts[1]) return null;
+
+    var rounds = [];
+    var chunks = parts[1].split('.');
+    if (chunks.length > 100) return null;
+
+    for (var c = 0; c < chunks.length; c++) {
+      var chunk = chunks[c];
+      if (!chunk.length || chunk.length > MAX_TRIES) return null;
+      var guesses = [];
+      for (var i = 0; i < chunk.length; i++) {
+        var v = ALPHA.indexOf(chunk.charAt(i));
+        if (v < 0) return null;
+        guesses.push([Math.floor(v / 9), Math.floor(v / 3) % 3, v % 3]);
+      }
+      rounds.push(guesses);
+    }
+    return { day: day, rounds: rounds };
+  }
+
+  function shareText() {
+    var scores = state.history.map(function (r) {
+      return r.won ? r.tries + '/' + MAX_TRIES : 'X/' + MAX_TRIES;
+    }).join(', ');
+
+    return 'Hueristic No. ' + (state.day + 1) + '\n' +
+           scores + '\n' +
+           SITE + '#r=' + encodeResult();
+  }
+
+  function renderShared(data) {
+    el.meta.hidden = true;
+    el.game.hidden = true;
+    el.shared.hidden = false;
+
+    var today = dayIndex();
+    var wins = 0;
+
+    el.sharedResults.innerHTML = '';
+
+    data.rounds.forEach(function (guesses, i) {
+      var last = guesses[guesses.length - 1];
+      var won = last[0] === 2 && last[1] === 2 && last[2] === 2;
+      if (won) wins++;
+
+      var block = document.createElement('div');
+
+      var head = document.createElement('div');
+      head.className = 'result-head';
+      // With a single round there is no ambiguity, so the label is just noise.
+      if (data.rounds.length > 1) {
+        var n = document.createElement('span');
+        n.className = 'n';
+        n.textContent = 'Round ' + (i + 1);
+        head.appendChild(n);
+      }
+      var sc = document.createElement('span');
+      sc.className = 'score' + (won ? '' : ' miss');
+      sc.textContent = won ? guesses.length + '/' + MAX_TRIES : 'Missed';
+      head.appendChild(sc);
+
+      var axis = document.createElement('div');
+      axis.className = 'axis';
+      ['H', 'S', 'L'].forEach(function (letter) {
+        var a = document.createElement('span');
+        a.textContent = letter;
+        axis.appendChild(a);
+      });
+
+      var grid = document.createElement('div');
+      grid.className = 'grid';
+      guesses.forEach(function (g) {
+        var row = document.createElement('div');
+        row.className = 'g';
+        g.forEach(function (v) {
+          var cell = document.createElement('span');
+          cell.className = 'cell ' + (v === 2 ? 'lock' : v === 1 ? 'near' : 'far');
+          row.appendChild(cell);
+        });
+        grid.appendChild(row);
+      });
+
+      block.appendChild(head);
+      block.appendChild(axis);
+      block.appendChild(grid);
+      el.sharedResults.appendChild(block);
+    });
+
+    // The headline is the outcome, not the puzzle number. Someone arriving
+    // from a link has never played; "No. 1" means nothing to them, while
+    // "Matched in four tries" is a fact worth reacting to.
+    var total = data.rounds.length;
+    if (total === 1) {
+      var tries = data.rounds[0].length;
+      el.sharedTitle.textContent = wins
+        ? (tries === 1 ? 'Matched on the first try' : 'Matched in ' + tries + ' tries')
+        : 'Missed the color';
+    } else {
+      el.sharedTitle.textContent = wins + ' of ' + total + ' rounds matched';
+    }
+
+    el.sharedNote.textContent = data.day === today
+      ? 'Hueristic No. ' + (data.day + 1) + ', shared from today. The same colors are waiting for you.'
+      : 'Hueristic No. ' + (data.day + 1) + '. Today\'s puzzle is No. ' + (today + 1) + '.';
+
+    el.shared.setAttribute('aria-label',
+      wins + ' of ' + data.rounds.length + ' rounds matched');
+  }
+
+  /* ---------- actions ---------- */
+
+  function apply(guess) {
+    var marks = grade(guess, state.target);
+    var won = marks.every(function (m) { return m.state === 'lock'; });
+
+    state.guesses.push({ guess: guess, marks: marks, won: won });
+    addRow(guess, marks);
+
+    var left = MAX_TRIES - state.guesses.length;
+    el.tries.textContent = left + (left === 1 ? ' try left' : ' tries left');
+
+    if (won || left === 0) reveal(won);
+    return { marks: marks, won: won };
+  }
+
+  function submit() {
+    if (state.over) return;
+    var r = apply(current());
+    say(r.marks, r.won);
+    persist();
+  }
+
+  function startRound() {
+    state.guesses = [];
+    state.over = false;
+
+    el.log.innerHTML = '';
+    el.verdict.hidden = true;
+    el.check.disabled = false;
+    el.hint.hidden = false;
+    el.stage.classList.remove('revealed');
+    while (el.stage.children.length > 1) el.stage.removeChild(el.stage.lastChild);
+
+    [el.h, el.s, el.l].forEach(function (i) { i.disabled = false; });
+    el.h.value = 180; el.s.value = 50; el.l.value = 50;
+
+    el.tries.textContent = MAX_TRIES + ' tries left';
+    clearTimeout(copyTimer);
+    el.share.textContent = 'Copy today\'s results';
+    el.fallback.hidden = true;
+    el.verdictBoard.hidden = true;
+    el.round.hidden = state.round === 1;
+    el.round.textContent = 'Round ' + state.round;
+
+    state.target = colorFor(state.day, state.round);
+    paint();
+  }
+
+  // Saved rounds keep only the slider values that were played. The target and
+  // the scoring are rebuilt from the date, so the record can't drift.
+  function rehydrate(r) {
+    var target = colorFor(state.day, r.round);
+    return {
+      round: r.round,
+      target: target,
+      won: r.won,
+      tries: r.tries,
+      guesses: r.guesses,
+      marks: r.guesses.map(function (g) { return grade(g, target); })
+    };
+  }
+
+  function startDay(saved) {
+    state.day = dayIndex();
+    state.seenHelp = !!(saved && saved.seenHelp);
+    // The id and the name outlive the day; the day's score does not.
+    state.clientId = (saved && saved.clientId) || uuid();
+    state.name = (saved && typeof saved.name === 'string') ? saved.name : '';
+    el.puzzleNo.textContent = 'No. ' + (state.day + 1);
+
+    // The record outlives the day it was earned on. Guard every field: a save
+    // written by an older version of this file won't have all of them.
+    if (saved && saved.record) {
+      var r = saved.record;
+      state.record = {
+        played: r.played || 0,
+        won: r.won || 0,
+        dist: (r.dist && r.dist.length === MAX_TRIES) ? r.dist.slice() : [0, 0, 0, 0, 0, 0],
+        days: r.days || 0,
+        lastDay: typeof r.lastDay === 'number' ? r.lastDay : -1,
+        chan: safeChan(r.chan),
+        recent: Array.isArray(r.recent) ? r.recent.slice(-20) : []
+      };
+    }
+    if (state.record.lastDay !== state.day) {
+      state.record.days += 1;
+      state.record.lastDay = state.day;
+    }
+
+    var sameDay = saved && saved.day === state.day;
+
+    if (!sameDay) {
+      state.round = 1;
+      state.history = [];
+      state.firstResult = 0;
+      state.posted = false;
+      renderHistory();
+      startRound();
+      persist();
+      return;
+    }
+
+    state.firstResult = saved.firstResult || 0;
+    state.posted = !!saved.posted;
+    state.history = (saved.history || []).map(rehydrate);
+
+    // A round one played before the board existed has no stored result. It is
+    // sitting in the day's history though, so recover it rather than locking
+    // the player out of the board until tomorrow.
+    if (!state.firstResult && state.history.length && state.history[0].round === 1) {
+      var first = state.history[0];
+      state.firstResult = first.won ? first.tries : 7;
+    }
+    // A round that already ended has been seen. Move on rather than replaying it.
+    state.round = saved.done ? saved.round + 1 : saved.round;
+    renderHistory();
+    startRound();
+
+    if (!saved.done && saved.pending) {
+      saved.pending.forEach(function (g) { apply(g); });
+    }
+    persist();
+  }
+
+  function nextRound() {
+    state.round += 1;
+    startRound();
+    persist();
+    el.check.focus();
+  }
+
+  [el.h, el.s, el.l].forEach(function (i) { i.addEventListener('input', paint); });
+
+  el.check.addEventListener('click', submit);
+  el.again.addEventListener('click', nextRound);
+
+  el.helpBtn.addEventListener('click', openHelp);
+  el.helpClose.addEventListener('click', closeHelp);
+  el.helpX.addEventListener('click', closeHelp);
+
+  function openStats() {
+    renderStats();
+    if (typeof el.stats.showModal === 'function') el.stats.showModal();
+    else el.stats.setAttribute('open', '');
+  }
+  function closeStats() {
+    if (typeof el.stats.close === 'function') el.stats.close();
+    else el.stats.removeAttribute('open');
+  }
+  el.statsBtn.addEventListener('click', openStats);
+  el.statsClose.addEventListener('click', closeStats);
+  el.statsX.addEventListener('click', closeStats);
+
+  el.boardBtn.hidden = !boardOn;
+  el.helpBoard.hidden = !boardOn;
+  el.verdictJoinBtn.addEventListener('click', joinFromVerdict);
+  el.verdictName.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') { e.preventDefault(); joinFromVerdict(); }
+  });
+  el.boardBtn.addEventListener('click', openBoard);
+  el.boardClose.addEventListener('click', closeBoard);
+  el.boardX.addEventListener('click', closeBoard);
+  el.boardJoinBtn.addEventListener('click', joinBoard);
+  el.boardName.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') { e.preventDefault(); joinBoard(); }
+  });
+
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Enter') return;
+    if (el.help.open || el.stats.open || el.board.open) return;   // a dialog owns Enter while it is up
+    e.preventDefault();
+    if (state.over) nextRound(); else submit();
+  });
+
+  var copyTimer = null;
+
+  /* The clipboard fails more often than you'd expect: permissions policy blocks
+     it in embedded frames, and it needs a secure context, so opening the file
+     from disk kills it too. window.prompt is no fallback either — sandboxed
+     frames ignore it without a word. So: try the API, try the old command, and
+     if both refuse, put the text on the page where it can always be selected. */
+  function legacyCopy(text) {
+    try {
+      var ta = document.createElement('textarea');
+      ta.value = text;
+      ta.setAttribute('readonly', '');
+      ta.style.position = 'fixed';
+      ta.style.top = '0';
+      ta.style.left = '-9999px';
+      document.body.appendChild(ta);
+      ta.select();
+      ta.setSelectionRange(0, text.length);
+      var ok = document.execCommand && document.execCommand('copy');
+      document.body.removeChild(ta);
+      return !!ok;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function copyText(text) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      return navigator.clipboard.writeText(text).then(
+        function () { return true; },
+        function () { return legacyCopy(text); }
+      );
+    }
+    return Promise.resolve(legacyCopy(text));
+  }
+
+  el.share.addEventListener('click', function () {
+    var text = shareText();
+
+    copyText(text).then(function (ok) {
+      clearTimeout(copyTimer);
+
+      if (ok) {
+        el.fallback.hidden = true;
+        el.share.textContent = 'Copied';
+        copyTimer = setTimeout(function () {
+          el.share.textContent = 'Copy today\'s results';
+        }, 2200);
+        return;
+      }
+
+      el.fallbackText.value = text;
+      el.fallback.hidden = false;
+      el.fallbackText.focus();
+      el.fallbackText.select();
+      el.share.textContent = 'Copy it below';
+    });
+  });
+
+  el.play.addEventListener('click', function () {
+    if (window.history && window.history.replaceState) {
+      window.history.replaceState(null, '', location.pathname + location.search);
+    } else {
+      location.hash = '';
+    }
+    el.shared.hidden = true;
+    el.meta.hidden = false;
+    el.game.hidden = false;
+    begin();
+  });
+
+  function begin() {
+    Store.load().then(function (saved) {
+      startDay(saved);
+      if (!state.seenHelp) openHelp();
+    });
+  }
+
+  var shared = /(?:^|[#&?])r=([^&]+)/.exec(location.hash || '');
+  var parsed = shared ? decodeResult(decodeURIComponent(shared[1])) : null;
+
+  if (parsed) renderShared(parsed);
+  else begin();
+})();
+</script>
+</body>
+</html>
