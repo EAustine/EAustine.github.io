@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Colordle — guess today's color</title>
+<title>Hueristic — guess today's colour</title>
 <meta name="description" content="A hidden color, three sliders, six tries to match it. A new set every day.">
 <meta name="theme-color" content="#58585a">
 
@@ -16,16 +16,16 @@
      full. If you ever move the game, update these three lines and the SITE
      fallback in the script. -->
 <meta property="og:type" content="website">
-<meta property="og:site_name" content="Colordle">
-<meta property="og:title" content="Colordle">
+<meta property="og:site_name" content="Hueristic">
+<meta property="og:title" content="Hueristic">
 <meta property="og:description" content="A hidden color, three sliders, six tries to match it.">
-<meta property="og:url" content="https://eaustine.github.io/colordle/">
-<meta property="og:image" content="https://eaustine.github.io/colordle/og.png">
+<meta property="og:url" content="https://eaustine.github.io/hueristic/">
+<meta property="og:image" content="https://eaustine.github.io/hueristic/og.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
-<meta property="og:image:alt" content="A blue swatch above a hue slider, beside the word Colordle.">
+<meta property="og:image:alt" content="A blue swatch above a hue slider, beside the word Hueristic.">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Colordle">
+<meta name="twitter:title" content="Hueristic">
 <meta name="twitter:description" content="A hidden color, three sliders, six tries to match it.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -79,24 +79,6 @@
     font-weight:800;
     letter-spacing:-.03em;
     margin:0;
-  }
-
-  /* The chip stands in for the first 'o'. Every number here is that glyph's
-     own metric in Archivo at weight 800, so the word keeps its rhythm: the
-     margins are the 'o' side bearings, the width is its ink width, and the
-     height is the x-height with no overshoot — round letters overshoot the
-     x-line, a flat-sided square must not.
-     It is ink rather than brand blue on purpose. In the app nothing may
-     compete with the color being judged, and a solid white chip is already
-     this game's own symbol for a matched channel. */
-  .wordmark .oh{
-    display:inline-block;
-    width:.5608em;
-    height:.5260em;
-    margin:0 .0369em 0 .0374em;
-    border-radius:.02em;
-    background:var(--ink);
-    vertical-align:baseline;
   }
 
   .meta{
@@ -553,7 +535,7 @@
 <main class="app">
 
   <header>
-    <h1 class="wordmark">C<i class="oh" aria-hidden="true"></i><span class="sr">o</span>lordle</h1>
+    <h1 class="wordmark">Hueristic</h1>
     <div class="meta" id="meta">
       <span id="puzzleNo">No. 1</span>
       <button class="mode" id="boardBtn" type="button" hidden>Board</button>
@@ -632,7 +614,7 @@
 
   <section class="shared" id="shared" hidden>
     <img class="hero" src="og.png" width="1200" height="630"
-         alt="A blue swatch above a hue slider, beside the word Colordle.">
+         alt="A blue swatch above a hue slider, beside the word Hueristic.">
 
     <h2 id="sharedTitle"></h2>
     <p id="sharedNote"></p>
@@ -782,7 +764,7 @@
   // page is opened straight off disk — set it to your real address.
   var SITE = (location.protocol === 'https:' || location.protocol === 'http:')
     ? location.origin + location.pathname.replace(/index\.html$/, '')
-    : 'https://eaustine.github.io/colordle/';
+    : 'https://eaustine.github.io/hueristic/';
 
   /* ---------- storage ----------
      This file runs in an embedded preview and, later, on your own domain, and
@@ -791,7 +773,7 @@
      locked-down browser still plays — it just forgets. Every path returns a
      promise so the rest of the game only deals with one interface. */
   var Store = (function () {
-    var KEY = 'colordle:v1';
+    var KEY = 'hueristic:v1';
 
     var host = (window.storage && typeof window.storage.get === 'function') ? window.storage : null;
     if (host) {
@@ -810,7 +792,7 @@
 
     var local = null;
     try {
-      var probe = '__colordle__';
+      var probe = '__hueristic__';
       window.localStorage.setItem(probe, '1');
       window.localStorage.removeItem(probe);
       local = window.localStorage;
@@ -972,7 +954,7 @@
   if (boardOn && (/^sb_secret_/.test(BOARD.key) || keyRole(BOARD.key) === 'service_role')) {
     boardOn = false;
     if (window.console && console.error) {
-      console.error('Colordle: that is a Supabase secret key, not the publishable one. ' +
+      console.error('Hueristic: that is a Supabase secret key, not the publishable one. ' +
                     'The board is off. Replace it and rotate the key you pasted.');
     }
   }
@@ -1631,7 +1613,7 @@
       return r.won ? r.tries + '/' + MAX_TRIES : 'X/' + MAX_TRIES;
     }).join(', ');
 
-    return 'Colordle No. ' + (state.day + 1) + '\n' +
+    return 'Hueristic No. ' + (state.day + 1) + '\n' +
            scores + '\n' +
            SITE + '#r=' + encodeResult();
   }
@@ -1708,8 +1690,8 @@
     }
 
     el.sharedNote.textContent = data.day === today
-      ? 'Colordle No. ' + (data.day + 1) + ', shared from today. The same colors are waiting for you.'
-      : 'Colordle No. ' + (data.day + 1) + '. Today\'s puzzle is No. ' + (today + 1) + '.';
+      ? 'Hueristic No. ' + (data.day + 1) + ', shared from today. The same colors are waiting for you.'
+      : 'Hueristic No. ' + (data.day + 1) + '. Today\'s puzzle is No. ' + (today + 1) + '.';
 
     el.shared.setAttribute('aria-label',
       wins + ' of ' + data.rounds.length + ' rounds matched');
