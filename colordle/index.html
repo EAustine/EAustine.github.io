@@ -102,7 +102,9 @@
   .meta{
     display:flex;
     align-items:baseline;
-    gap:14px;
+    flex-wrap:wrap;
+    justify-content:flex-end;
+    gap:6px 13px;
     font-size:13px;
     color:var(--dim);
   }
@@ -421,7 +423,51 @@
     color:var(--dim);
   }
   .dist .bar .fill.on{background:var(--ink);color:#2b2b2d}
-  .dist-note{margin:12px 0 20px;font-size:12.5px;color:var(--dim)}
+
+  .stat-label{
+    margin:22px 0 10px;
+    font-size:12px;
+    font-weight:600;
+    color:var(--dim);
+  }
+  .stat-note{margin:16px 0 20px;font-size:12.5px;line-height:1.55;color:var(--dim);max-width:40ch}
+  .stat-empty{margin:0 0 20px;font-size:14px;line-height:1.6;color:var(--dim)}
+
+  /* ---------- leaderboard ---------- */
+  .board-you{margin:0 0 4px;font-size:14px;line-height:1.55;max-width:42ch}
+
+  /* Your own bar is marked by a rule beside it rather than a colour, for the
+     same reason the game's feedback carries no colour. */
+  .dist .bar.you .t{color:var(--ink);font-weight:600}
+  .dist .bar.you .fill{box-shadow:0 0 0 1px var(--edge-strong)}
+
+  .board-list{list-style:none;margin:0;padding:0;display:grid;gap:7px}
+  .board-list li{
+    display:grid;
+    grid-template-columns:18px 1fr auto;
+    gap:11px;
+    align-items:baseline;
+    font-size:13.5px;
+  }
+  .board-list .pos{color:var(--dim);text-align:right}
+  .board-list .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .board-list .score{font-weight:600}
+  .board-list .score.miss{color:var(--dim);font-weight:500}
+
+  .join-row{display:flex;gap:9px;margin-bottom:4px}
+  .join-row input{
+    flex:1;
+    min-width:0;
+    padding:10px 11px;
+    background:rgba(0,0,0,.2);
+    border:1px solid var(--edge);
+    border-radius:2px;
+    color:var(--ink);
+    font-family:inherit;
+    font-size:14px;
+  }
+  .join-row input::placeholder{color:var(--dim)}
+  .join-row input:focus-visible{outline:2px solid #fff;outline-offset:2px;border-color:var(--edge-strong)}
 
   /* ---------- shared result ---------- */
   .shared{margin-top:var(--gap)}
@@ -502,6 +548,7 @@
     <h1 class="wordmark">C<i class="oh" aria-hidden="true"></i><span class="sr">o</span>lordle</h1>
     <div class="meta" id="meta">
       <span id="puzzleNo">No. 1</span>
+      <button class="mode" id="boardBtn" type="button" hidden>Board</button>
       <button class="mode" id="statsBtn" type="button">Stats</button>
       <button class="mode" id="helpBtn" type="button">How to play</button>
     </div>
@@ -639,11 +686,57 @@
 
     <h2 id="statsTitle">Your record</h2>
 
-    <div class="tallies" id="tallies"></div>
-    <div class="dist" id="dist"></div>
-    <p class="dist-note">Tries taken when you matched.</p>
+    <p class="stat-empty" id="statsEmpty" hidden>Nothing here yet. Finish a round
+    and this fills in.</p>
+
+    <div id="statsBody">
+      <div class="tallies" id="tallies"></div>
+
+      <h3 class="stat-label">Tries taken to match</h3>
+      <div class="dist" id="dist"></div>
+
+      <h3 class="stat-label">Tries taken to lock each slider</h3>
+      <div class="dist" id="chan"></div>
+
+      <p class="stat-note" id="statsNote"></p>
+    </div>
 
     <button class="btn" id="statsClose" type="button">Back to the game</button>
+  </dialog>
+
+  <dialog id="board" aria-labelledby="boardTitle">
+    <button class="close" id="boardX" type="button" aria-label="Close the board">
+      <svg viewBox="0 0 14 14" aria-hidden="true" focusable="false">
+        <path d="M1 1 L13 13 M13 1 L1 13" fill="none" stroke="currentColor"
+              stroke-width="1.6" stroke-linecap="round"/>
+      </svg>
+    </button>
+
+    <h2 id="boardTitle">Today's board</h2>
+
+    <p class="stat-empty" id="boardState">Loading today's board…</p>
+
+    <div id="boardBody" hidden>
+      <p class="board-you" id="boardYou"></p>
+      <h3 class="stat-label">How everyone did on their first round</h3>
+      <div class="dist" id="boardDist"></div>
+      <h3 class="stat-label">Fastest today</h3>
+      <ol class="board-list" id="boardList"></ol>
+    </div>
+
+    <div id="boardJoin" hidden>
+      <label class="stat-label" for="boardName">Add a name to take a place</label>
+      <div class="join-row">
+        <input id="boardName" type="text" maxlength="20" autocomplete="nickname"
+               placeholder="Your name">
+        <button class="btn" id="boardJoinBtn" type="button">Join</button>
+      </div>
+      <p class="stat-note">Your name and your first-round score for the day
+      are public and can't be edited afterwards. Only the first round counts —
+      later rounds are practice.</p>
+    </div>
+
+    <button class="btn ghost" id="boardClose" type="button">Back to the game</button>
   </dialog>
 
 </main>
@@ -766,7 +859,23 @@
     statsClose: document.getElementById('statsClose'),
     statsX: document.getElementById('statsX'),
     tallies: document.getElementById('tallies'),
-    dist: document.getElementById('dist')
+    dist: document.getElementById('dist'),
+    chan: document.getElementById('chan'),
+    statsBody: document.getElementById('statsBody'),
+    statsEmpty: document.getElementById('statsEmpty'),
+    statsNote: document.getElementById('statsNote'),
+    board: document.getElementById('board'),
+    boardBtn: document.getElementById('boardBtn'),
+    boardX: document.getElementById('boardX'),
+    boardClose: document.getElementById('boardClose'),
+    boardState: document.getElementById('boardState'),
+    boardBody: document.getElementById('boardBody'),
+    boardYou: document.getElementById('boardYou'),
+    boardDist: document.getElementById('boardDist'),
+    boardList: document.getElementById('boardList'),
+    boardJoin: document.getElementById('boardJoin'),
+    boardName: document.getElementById('boardName'),
+    boardJoinBtn: document.getElementById('boardJoinBtn')
   };
 
   function openHelp() {
@@ -788,10 +897,98 @@
     history: [],
     over: false,
     seenHelp: false,
+    clientId: '',
+    name: '',
+    firstResult: 0,   // round one's score for the day: 1-6 matched, 7 missed
+    posted: false,
     // Survives the daily reset. Everything else in the save is thrown away
     // when the date rolls over; this is the part that accumulates.
-    record: { played: 0, won: 0, dist: [0, 0, 0, 0, 0, 0], days: 0, lastDay: -1 }
+    //   chan   — tries taken to first lock each slider, summed, with a count
+    //            of the rounds it locked in at all
+    //   recent — the last 20 round scores, 0 for a miss, for the trend line
+    record: {
+      played: 0, won: 0, dist: [0, 0, 0, 0, 0, 0], days: 0, lastDay: -1,
+      chan: { h: [0, 0], s: [0, 0], l: [0, 0] },
+      recent: []
+    }
   };
+
+  /* ---------- leaderboard ----------
+     Fill these in from Supabase: Project Settings → API. The anon key is
+     designed to be public and shipped in client code; the rules that protect
+     the data live in the database, not here. Never paste the service_role key
+     into this file — it bypasses every one of them.
+
+     Left blank, the board switches itself off and the game is unchanged. */
+  var BOARD = {
+    url: 'https://tmaukbgdkkqcbwqgrmje.supabase.co',
+    key: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRtYXVrYmdka2txY2J3cWdybWplIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgxOTEwMDksImV4cCI6MjEwMzc2NzAwOX0.bHY8hNm35EtsDxSIibm8c06jxGX-oS_5UEAZN1XzDSc'
+  };
+
+  var boardOn = !!(BOARD.url && BOARD.key);
+
+  // Reads the role out of a legacy JWT key without verifying it — this is a
+  // guard against a footgun, not a security check.
+  function keyRole(key) {
+    try {
+      var payload = key.split('.')[1];
+      if (!payload) return '';
+      return JSON.parse(atob(payload.replace(/-/g, '+').replace(/_/g, '/'))).role || '';
+    } catch (e) {
+      return '';
+    }
+  }
+
+  // A secret key in a web page bypasses every policy in the database. Better
+  // to switch the board off and say so than to quietly publish it.
+  if (boardOn && (/^sb_secret_/.test(BOARD.key) || keyRole(BOARD.key) === 'service_role')) {
+    boardOn = false;
+    if (window.console && console.error) {
+      console.error('Colordle: that is a Supabase secret key, not the publishable one. ' +
+                    'The board is off. Replace it and rotate the key you pasted.');
+    }
+  }
+
+  function boardHeaders() {
+    var h = {
+      'apikey': BOARD.key,
+      'Content-Type': 'application/json'
+    };
+    // Legacy anon keys are JWTs and want a bearer header as well. The newer
+    // sb_publishable_ keys are rejected if sent that way, so only add it when
+    // the key actually is a JWT.
+    if (BOARD.key.slice(0, 3) === 'eyJ') {
+      h['Authorization'] = 'Bearer ' + BOARD.key;
+    }
+    return h;
+  }
+
+  function uuid() {
+    if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+      var r = Math.random() * 16 | 0;
+      return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+    });
+  }
+
+
+  var CHAN_NAME = { h: 'Hue', s: 'Saturation', l: 'Lightness' };
+
+  function blankChan() {
+    return { h: [0, 0], s: [0, 0], l: [0, 0] };
+  }
+
+  function safeChan(c) {
+    var out = blankChan();
+    if (!c) return out;
+    ['h', 's', 'l'].forEach(function (k) {
+      if (c[k] && c[k].length === 2 &&
+          typeof c[k][0] === 'number' && typeof c[k][1] === 'number') {
+        out[k] = [c[k][0], c[k][1]];
+      }
+    });
+    return out;
+  }
 
   function persist() {
     Store.save({
@@ -801,6 +998,10 @@
       done: state.over,
       seenHelp: state.seenHelp,
       record: state.record,
+      clientId: state.clientId,
+      name: state.name,
+      firstResult: state.firstResult,
+      posted: state.posted,
       // Only raw slider values are stored. Targets come back from colorFor()
       // and scores are re-derived, so a change to the tolerances can never
       // leave saved rounds contradicting the current rules.
@@ -1013,6 +1214,31 @@
       state.record.dist[n - 1] += 1;
     }
 
+    // Which try did each slider first land on? This is the number that tells
+    // a player what to practise — a win in four says nothing about whether
+    // saturation or hue was the thing holding them up.
+    var seen = {};
+    state.guesses.forEach(function (g, i) {
+      g.marks.forEach(function (m) {
+        if (m.state === 'lock' && !seen[m.key]) {
+          seen[m.key] = true;
+          state.record.chan[m.key][0] += i + 1;
+          state.record.chan[m.key][1] += 1;
+        }
+      });
+    });
+
+    state.record.recent.push(won ? n : 0);
+    if (state.record.recent.length > 20) state.record.recent.shift();
+
+    // Only the first round of the day goes to the board. With unlimited
+    // replays, "best of the day" would just reward whoever ground out the
+    // most attempts until one came up lucky.
+    if (state.round === 1) {
+      state.firstResult = won ? n : 7;
+      postScore();
+    }
+
     state.history.push({
       round: state.round,
       target: state.target,
@@ -1025,10 +1251,159 @@
     persist();
   }
 
+  function postScore() {
+    if (!boardOn || !state.name || state.posted || !state.firstResult) return;
+
+    fetch(BOARD.url + '/rest/v1/scores', {
+      method: 'POST',
+      headers: boardHeaders(),
+      body: JSON.stringify({
+        day: state.day,
+        client_id: state.clientId,
+        name: state.name,
+        tries: state.firstResult
+      })
+    }).then(function (res) {
+      // 409 means the unique key rejected a second score for today, which is
+      // the rule working. Either way there is nothing left to send.
+      if (res.ok || res.status === 409) {
+        state.posted = true;
+        persist();
+      }
+    })['catch'](function () { /* offline: the game does not care */ });
+  }
+
+  function fetchBoard() {
+    var q = '/rest/v1/leaderboard?select=name,tries,created_at' +
+            '&day=eq.' + state.day +
+            '&order=tries.asc,created_at.asc&limit=500';
+    return fetch(BOARD.url + q, { headers: boardHeaders() }).then(function (res) {
+      if (!res.ok) throw new Error('board unavailable');
+      return res.json();
+    });
+  }
+
+  function renderBoard(rows) {
+    var total = rows.length;
+
+    // distribution across the seven outcomes, 7 being a miss
+    var buckets = [0, 0, 0, 0, 0, 0, 0];
+    rows.forEach(function (row) {
+      if (row.tries >= 1 && row.tries <= 7) buckets[row.tries - 1] += 1;
+    });
+
+    var mine = state.firstResult;
+    var peak = Math.max.apply(null, buckets.concat([1]));
+
+    el.boardDist.innerHTML = '';
+    buckets.forEach(function (count, i) {
+      var label = i === 6 ? '✗' : i + 1;
+      var row = document.createElement('div');
+      row.className = 'bar' + (mine === i + 1 ? ' you' : '');
+      var t = document.createElement('span');
+      t.className = 't';
+      t.textContent = label;
+      var fill = document.createElement('span');
+      fill.className = 'fill' + (count ? ' on' : '');
+      fill.style.width = Math.round(count / peak * 100) + '%';
+      fill.textContent = count;
+      row.appendChild(t);
+      row.appendChild(fill);
+      el.boardDist.appendChild(row);
+    });
+
+    if (mine && total) {
+      var behind = rows.filter(function (row) { return row.tries > mine; }).length;
+      var pct = Math.round(behind / total * 100);
+      el.boardYou.textContent = mine === 7
+        ? 'You missed today\'s first color. ' + total + ' have played.'
+        : 'You matched in ' + mine + ', ahead of ' + pct + '% of today\'s ' + total + ' players.';
+    } else if (mine) {
+      el.boardYou.textContent = 'You matched in ' + mine + '. Nobody else has played yet.';
+    } else {
+      el.boardYou.textContent = 'Finish your first round to take a place on the board.';
+    }
+
+    el.boardList.innerHTML = '';
+    rows.slice(0, 10).forEach(function (row, i) {
+      var li = document.createElement('li');
+      var pos = document.createElement('span');
+      pos.className = 'pos';
+      pos.textContent = i + 1;
+      var nm = document.createElement('span');
+      nm.className = 'nm';
+      nm.textContent = row.name;
+      var sc = document.createElement('span');
+      sc.className = 'score' + (row.tries === 7 ? ' miss' : '');
+      sc.textContent = row.tries === 7 ? 'Missed' : row.tries + '/' + MAX_TRIES;
+      li.appendChild(pos);
+      li.appendChild(nm);
+      li.appendChild(sc);
+      el.boardList.appendChild(li);
+    });
+
+    el.boardJoin.hidden = !!state.name;
+    el.boardBody.hidden = false;
+    el.boardState.hidden = true;
+  }
+
+  function openBoard() {
+    el.boardBody.hidden = true;
+    el.boardJoin.hidden = true;
+    el.boardState.hidden = false;
+    el.boardState.textContent = 'Loading today\'s board…';
+
+    if (typeof el.board.showModal === 'function') el.board.showModal();
+    else el.board.setAttribute('open', '');
+
+    fetchBoard().then(renderBoard)['catch'](function () {
+      el.boardState.textContent =
+        'Couldn\'t reach the board just now. Your rounds are safe either way.';
+      el.boardJoin.hidden = !!state.name;
+    });
+  }
+
+  function closeBoard() {
+    if (typeof el.board.close === 'function') el.board.close();
+    else el.board.removeAttribute('open');
+  }
+
+  function joinBoard() {
+    var name = el.boardName.value.replace(/\s+/g, ' ').trim().slice(0, 20);
+    if (!name) { el.boardName.focus(); return; }
+    state.name = name;
+    persist();
+    postScore();
+    el.boardJoin.hidden = true;
+    // Give the insert a moment to land before asking for the board again.
+    setTimeout(function () {
+      fetchBoard().then(renderBoard)['catch'](function () {});
+    }, 400);
+  }
+
+  function bar(host, label, width, text, filled) {
+    var row = document.createElement('div');
+    row.className = 'bar';
+    var t = document.createElement('span');
+    t.className = 't';
+    t.textContent = label;
+    var fill = document.createElement('span');
+    fill.className = 'fill' + (filled ? ' on' : '');
+    fill.style.width = Math.round(width * 100) + '%';
+    fill.textContent = text;
+    row.appendChild(t);
+    row.appendChild(fill);
+    host.appendChild(row);
+  }
+
   function renderStats() {
     var r = state.record;
-    var rate = r.played ? Math.round(r.won / r.played * 100) : 0;
 
+    el.statsEmpty.hidden = r.played > 0;
+    el.statsBody.hidden = r.played === 0;
+    if (!r.played) return;
+
+    var rate = Math.round(r.won / r.played * 100);
     el.tallies.innerHTML = '';
     [['Rounds', r.played], ['Matched', r.won], ['Win rate', rate + '%']]
       .forEach(function (pair) {
@@ -1044,25 +1419,63 @@
         el.tallies.appendChild(box);
       });
 
-    var peak = Math.max.apply(null, r.dist.concat([1]));
+    // Misses belong on this chart. Leaving them off flatters the player and
+    // hides the shape of how they actually lose.
+    var missed = r.played - r.won;
+    var peak = Math.max.apply(null, r.dist.concat([missed, 1]));
     el.dist.innerHTML = '';
     r.dist.forEach(function (count, i) {
-      var row = document.createElement('div');
-      row.className = 'bar';
-
-      var t = document.createElement('span');
-      t.className = 't';
-      t.textContent = i + 1;
-
-      var fill = document.createElement('span');
-      fill.className = 'fill' + (count ? ' on' : '');
-      fill.style.width = Math.round(count / peak * 100) + '%';
-      fill.textContent = count;
-
-      row.appendChild(t);
-      row.appendChild(fill);
-      el.dist.appendChild(row);
+      bar(el.dist, i + 1, count / peak, count, count > 0);
     });
+    bar(el.dist, '✗', missed / peak, missed, false);
+
+    // Average try on which each slider first landed.
+    var avg = {};
+    ['h', 's', 'l'].forEach(function (k) {
+      avg[k] = r.chan[k][1] ? r.chan[k][0] / r.chan[k][1] : null;
+    });
+    var slowest = Math.max.apply(null, ['h', 's', 'l'].map(function (k) {
+      return avg[k] === null ? 0 : avg[k];
+    }).concat([1]));
+
+    el.chan.innerHTML = '';
+    ['h', 's', 'l'].forEach(function (k) {
+      if (avg[k] === null) {
+        bar(el.chan, k.toUpperCase(), 0, '—', false);
+      } else {
+        bar(el.chan, k.toUpperCase(), avg[k] / slowest, avg[k].toFixed(1), true);
+      }
+    });
+
+    var notes = [];
+    var ranked = ['h', 's', 'l'].filter(function (k) { return avg[k] !== null; })
+      .sort(function (a, b) { return avg[a] - avg[b]; });
+
+    // Only worth calling out once there is enough data for the gap to mean
+    // something, and only when the gap is actually wide.
+    if (ranked.length === 3 && r.played >= 5) {
+      var best = ranked[0], worst = ranked[2];
+      if (avg[worst] - avg[best] >= 0.5) {
+        notes.push(CHAN_NAME[best] + ' comes to you fastest. ' +
+                   CHAN_NAME[worst] + ' costs you about ' +
+                   (avg[worst] - avg[best]).toFixed(1) + ' more tries.');
+      } else {
+        notes.push('All three sliders are landing at about the same rate.');
+      }
+    }
+
+    if (r.recent.length >= 6) {
+      var wins = r.recent.filter(function (n) { return n > 0; });
+      if (wins.length >= 3) {
+        var recentAvg = wins.reduce(function (a, b) { return a + b; }, 0) / wins.length;
+        notes.push('Your last ' + wins.length + ' matches averaged ' +
+                   recentAvg.toFixed(1) + ' tries.');
+      }
+    }
+
+    if (r.days > 1) notes.push('Played on ' + r.days + ' days.');
+
+    el.statsNote.textContent = notes.join(' ');
   }
 
   /* ---------- sharing ----------
@@ -1261,6 +1674,9 @@
   function startDay(saved) {
     state.day = dayIndex();
     state.seenHelp = !!(saved && saved.seenHelp);
+    // The id and the name outlive the day; the day's score does not.
+    state.clientId = (saved && saved.clientId) || uuid();
+    state.name = (saved && typeof saved.name === 'string') ? saved.name : '';
     el.puzzleNo.textContent = 'No. ' + (state.day + 1);
 
     // The record outlives the day it was earned on. Guard every field: a save
@@ -1272,7 +1688,9 @@
         won: r.won || 0,
         dist: (r.dist && r.dist.length === MAX_TRIES) ? r.dist.slice() : [0, 0, 0, 0, 0, 0],
         days: r.days || 0,
-        lastDay: typeof r.lastDay === 'number' ? r.lastDay : -1
+        lastDay: typeof r.lastDay === 'number' ? r.lastDay : -1,
+        chan: safeChan(r.chan),
+        recent: Array.isArray(r.recent) ? r.recent.slice(-20) : []
       };
     }
     if (state.record.lastDay !== state.day) {
@@ -1285,12 +1703,16 @@
     if (!sameDay) {
       state.round = 1;
       state.history = [];
+      state.firstResult = 0;
+      state.posted = false;
       renderHistory();
       startRound();
       persist();
       return;
     }
 
+    state.firstResult = saved.firstResult || 0;
+    state.posted = !!saved.posted;
     state.history = (saved.history || []).map(rehydrate);
     // A round that already ended has been seen. Move on rather than replaying it.
     state.round = saved.done ? saved.round + 1 : saved.round;
@@ -1332,9 +1754,18 @@
   el.statsClose.addEventListener('click', closeStats);
   el.statsX.addEventListener('click', closeStats);
 
+  el.boardBtn.hidden = !boardOn;
+  el.boardBtn.addEventListener('click', openBoard);
+  el.boardClose.addEventListener('click', closeBoard);
+  el.boardX.addEventListener('click', closeBoard);
+  el.boardJoinBtn.addEventListener('click', joinBoard);
+  el.boardName.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') { e.preventDefault(); joinBoard(); }
+  });
+
   document.addEventListener('keydown', function (e) {
     if (e.key !== 'Enter') return;
-    if (el.help.open || el.stats.open) return;   // Enter belongs to a dialog while one is up
+    if (el.help.open || el.stats.open || el.board.open) return;   // a dialog owns Enter while it is up
     e.preventDefault();
     if (state.over) nextRound(); else submit();
   });
