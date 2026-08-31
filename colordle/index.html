@@ -416,25 +416,35 @@
     color:var(--dim);
     max-width:44ch;
   }
-  .results{display:grid;gap:20px;margin-bottom:24px}
+  .results{display:grid;gap:20px;margin-bottom:26px}
   .result-head{
     display:flex;
     justify-content:space-between;
     align-items:baseline;
     gap:12px;
-    margin-bottom:8px;
+    margin-bottom:9px;
     font-size:13.5px;
   }
   .result-head .n{color:var(--dim)}
   .result-head .score{font-weight:600}
   .result-head .score.miss{color:var(--dim);font-weight:500}
 
-  .grid{display:grid;gap:5px}
-  .grid .g{display:grid;grid-template-columns:repeat(3,1fr);gap:5px}
-  .cell{height:24px;border-radius:2px;border:1px solid transparent}
+  /* Narrow tiles, not full-width bars. Empty full-width rectangles with a
+     hairline border read as text inputs, which is the wrong invitation. */
+  .grid{display:grid;gap:5px;justify-content:start}
+  .grid .g,
+  .axis{display:grid;grid-template-columns:repeat(3,56px);gap:5px}
+  .axis{margin-bottom:6px}
+  .axis span{font-size:11px;color:var(--dim);text-align:center}
+  .cell{height:30px;border-radius:2px;border:1px solid transparent}
   .cell.lock{background:var(--ink);border-color:var(--ink)}
   .cell.near{border-color:var(--edge-strong)}
   .cell.far{border-color:var(--edge)}
+
+  .pitch{margin:0 0 20px}
+  .key{display:flex;flex-wrap:wrap;gap:16px;margin:0 0 26px}
+  .key > span{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--dim)}
+  .key .cell{width:24px;height:16px}
 
   .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 
@@ -526,6 +536,16 @@
   <section class="shared" id="shared" hidden>
     <h2 id="sharedTitle"></h2>
     <p id="sharedNote"></p>
+    <p class="pitch">Each round hides a color. You get six tries to match it,
+    using a hue, a saturation and a lightness slider. Every try tells you how
+    close each of the three is.</p>
+
+    <div class="key">
+      <span><span class="cell lock"></span>matched</span>
+      <span><span class="cell near"></span>close</span>
+      <span><span class="cell far"></span>far off</span>
+    </div>
+
     <div class="results" id="sharedResults"></div>
     <button class="btn" id="playBtn" type="button">Play today's colors</button>
   </section>
@@ -1070,10 +1090,10 @@
     var today = dayIndex();
     var wins = 0;
 
-    el.sharedTitle.textContent = 'Colordle No. ' + (data.day + 1);
+    el.sharedTitle.textContent = 'No. ' + (data.day + 1);
     el.sharedNote.textContent = data.day === today
-      ? 'Someone shared their rounds from today. The same colors are waiting for you.'
-      : 'Someone shared their rounds from an earlier day. Today\'s puzzle is No. ' + (today + 1) + '.';
+      ? 'Someone shared their Colordle rounds from today. The same colors are waiting for you.'
+      : 'Someone shared their Colordle rounds from an earlier day. Today\'s puzzle is No. ' + (today + 1) + '.';
 
     el.sharedResults.innerHTML = '';
 
@@ -1086,14 +1106,25 @@
 
       var head = document.createElement('div');
       head.className = 'result-head';
-      var n = document.createElement('span');
-      n.className = 'n';
-      n.textContent = 'Round ' + (i + 1);
+      // With a single round there is no ambiguity, so the label is just noise.
+      if (data.rounds.length > 1) {
+        var n = document.createElement('span');
+        n.className = 'n';
+        n.textContent = 'Round ' + (i + 1);
+        head.appendChild(n);
+      }
       var sc = document.createElement('span');
       sc.className = 'score' + (won ? '' : ' miss');
       sc.textContent = won ? guesses.length + '/' + MAX_TRIES : 'Missed';
-      head.appendChild(n);
       head.appendChild(sc);
+
+      var axis = document.createElement('div');
+      axis.className = 'axis';
+      ['H', 'S', 'L'].forEach(function (letter) {
+        var a = document.createElement('span');
+        a.textContent = letter;
+        axis.appendChild(a);
+      });
 
       var grid = document.createElement('div');
       grid.className = 'grid';
@@ -1109,6 +1140,7 @@
       });
 
       block.appendChild(head);
+      block.appendChild(axis);
       block.appendChild(grid);
       el.sharedResults.appendChild(block);
     });
