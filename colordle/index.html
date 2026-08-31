@@ -7,6 +7,10 @@
 <meta name="description" content="A hidden color, three sliders, six tries to match it. A new set every day.">
 <meta name="theme-color" content="#58585a">
 
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="icon" href="favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+
 <!-- SOCIAL PREVIEW — the one thing in this file that can't configure itself.
      Link crawlers don't run JavaScript, so these URLs have to be written out in
      full. If you ever move the game, update these three lines and the SITE
@@ -75,6 +79,24 @@
     font-weight:800;
     letter-spacing:-.03em;
     margin:0;
+  }
+
+  /* The chip stands in for the first 'o'. Every number here is that glyph's
+     own metric in Archivo at weight 800, so the word keeps its rhythm: the
+     margins are the 'o' side bearings, the width is its ink width, and the
+     height is the x-height with no overshoot — round letters overshoot the
+     x-line, a flat-sided square must not.
+     It is ink rather than brand blue on purpose. In the app nothing may
+     compete with the color being judged, and a solid white chip is already
+     this game's own symbol for a matched channel. */
+  .wordmark .oh{
+    display:inline-block;
+    width:.5608em;
+    height:.5260em;
+    margin:0 .0369em 0 .0374em;
+    border-radius:.02em;
+    background:var(--ink);
+    vertical-align:baseline;
   }
 
   .meta{
@@ -477,7 +499,7 @@
 <main class="app">
 
   <header>
-    <h1 class="wordmark">Colordle</h1>
+    <h1 class="wordmark">C<i class="oh" aria-hidden="true"></i><span class="sr">o</span>lordle</h1>
     <div class="meta" id="meta">
       <span id="puzzleNo">No. 1</span>
       <button class="mode" id="statsBtn" type="button">Stats</button>
