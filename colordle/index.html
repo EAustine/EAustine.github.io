@@ -404,14 +404,15 @@
   /* ---------- shared result ---------- */
   .shared{margin-top:var(--gap)}
   /* width and height attributes are on the tag too, so the page doesn't jump
-     when the image arrives. */
+     when the image arrives. No shadow: the card sits a clear step darker than
+     the page, and a shadow on top of that would darken the surrounding grey
+     and make the card read lighter than it is. */
   .shared .hero{
     display:block;
     width:100%;
     height:auto;
     margin:0 0 22px;
     border-radius:2px;
-    box-shadow:var(--shadow);
   }
   .shared h2{
     margin:0 0 7px;
