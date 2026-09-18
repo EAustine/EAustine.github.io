@@ -63,13 +63,14 @@
   .brand{margin:0}
   /* Outlines, so the lockup never depends on a font loading. */
   .brand .mark{display:block;height:19px;width:auto}
+  .brand svg.mark{overflow:visible}
   .brand span{display:block;font-size:11.5px;font-weight:400;color:var(--muted);margin-top:4px;max-width:34ch;line-height:1.4}
   .top-actions{display:flex;align-items:center;gap:8px}
   .share-wrap{position:relative}
 
   .menu{
     position:absolute;top:calc(100% + 8px);right:0;z-index:6;
-    width:min(320px,calc(100vw - 28px));
+    width:300px;max-width:calc(100vw - 28px);
     background:var(--card);border-radius:12px;box-shadow:var(--shadow);padding:6px;
   }
   .menu-item{
@@ -247,6 +248,10 @@
   .note{margin:12px 0 0;font-size:12px;line-height:1.55;color:var(--muted)}
 
   @media (max-width:720px){
+    /* Anchored to the button, the menu hangs off the left edge, because Share
+       is not the rightmost control. Pin it to the viewport instead. */
+    .menu{position:fixed;top:56px;left:12px;right:12px;width:auto;max-width:none}
+
     /* The brand subtitle and the pixel readout both wrap into the buttons on a
        narrow screen. Neither is needed to use the tool. */
     .topbar{height:auto;padding:13px 14px;align-items:center}
@@ -283,7 +288,7 @@
 </head>
 <body>
 <header class="topbar">
-  <p class="brand"><img class="mark" src="wordmark.svg" alt="Matte" width="420" height="98"><span>The background is built from your image.</span></p>
+  <p class="brand"><svg class="mark" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 7196 1466" role="img" aria-label="Matte"><defs><linearGradient id="mk-g" x1="0" y1="0" x2="1373.7" y2="1373.7" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#6c2fb1"/><stop offset="1" stop-color="#5f2169"/></linearGradient></defs><g transform="translate(0 72)"><rect x="0" y="0" width="1373.7" height="1373.7" rx="261.00" fill="url(#mk-g)"/><rect x="370.90" y="318.97" width="631.90" height="683.83" rx="109.90" fill="#f2f2f4"/></g><g fill="#17171a" transform="translate(1604 1446) scale(1 -1)"><path transform="translate(0 0)" d="M174.84375 0V1446H523.15625L901.53125 340.875L1284.71875 1446H1631.03125V0H1383.53125V1134.25L1003.09375 0H799.96875L421.8125 1126.75V0Z"/><path transform="translate(1806 0)" d="M437.0625 -20Q337.71875 -20 259.5 16.359375Q181.28125 52.71875 136.53125 121.53125Q91.78125 190.34375 91.78125 288.4375Q91.78125 459.25 215.4375 545.921875Q339.09375 632.59375 609.375 636.8125L763.90625 640.5625V710.8125Q763.90625 793.15625 715.3125 839.359375Q666.71875 885.5625 564.59375 884.5Q489.4375 883.96875 427.375 849.328125Q365.3125 814.6875 344.59375 733.5625H137.875Q143.875 840.09375 199.390625 911.375Q254.90625 982.65625 351.78125 1018.328125Q448.65625 1054 576.03125 1054Q723.6875 1054 816.78125 1015.109375Q909.875 976.21875 953.75 902.546875Q997.625 828.875 997.625 724.5V0H792.8125L773.34375 185.5625Q717.5 69.3125 632.15625 24.65625Q546.8125 -20 437.0625 -20ZM515.9375 145.375Q561.28125 145.375 605.234375 161.703125Q649.1875 178.03125 684.765625 206.3125Q720.34375 234.59375 741.859375 269.71875Q763.375 304.84375 763.90625 342.5V506.25L636.75 504.375Q542.9375 502.96875 472.671875 483.734375Q402.40625 464.5 363.265625 423.140625Q324.125 381.78125 324.125 312.5Q324.125 233.875 378.859375 189.625Q433.59375 145.375 515.9375 145.375Z"/><path transform="translate(2926 0)" d="M553.03125 -8.5Q429.875 -8.5 362.46875 24.03125Q295.0625 56.5625 268.796875 116.59375Q242.53125 176.625 242.53125 259.625V861.875H74.53125V1034H249.96875L310.59375 1341H485.6875V1035.0625H716.84375V861.875H485.6875L486.75 269.1875Q486.75 223.21875 497.125 201.609375Q507.5 180 531.109375 173.625Q554.71875 167.25 594.21875 167.25H721.53125V13.1875Q701.46875 5.0625 660.859375 -1.71875Q620.25 -8.5 553.03125 -8.5Z"/><path transform="translate(3734 0)" d="M553.03125 -8.5Q429.875 -8.5 362.46875 24.03125Q295.0625 56.5625 268.796875 116.59375Q242.53125 176.625 242.53125 259.625V861.875H74.53125V1034H249.96875L310.59375 1341H485.6875V1035.0625H716.84375V861.875H485.6875L486.75 269.1875Q486.75 223.21875 497.125 201.609375Q507.5 180 531.109375 173.625Q554.71875 167.25 594.21875 167.25H721.53125V13.1875Q701.46875 5.0625 660.859375 -1.71875Q620.25 -8.5 553.03125 -8.5Z"/><path transform="translate(4542 0)" d="M595.34375 -20Q446.0625 -20 332.46875 43.625Q218.875 107.25 155.328125 225.25Q91.78125 343.25 91.78125 505.875Q91.78125 664.65625 149.59375 788.484375Q207.40625 912.3125 316.9375 983.15625Q426.46875 1054 581.21875 1054Q733.8125 1054 838.140625 989.15625Q942.46875 924.3125 996.15625 807.5Q1049.84375 690.6875 1049.84375 534.875V460.8125H334.5625Q334.03125 373.03125 362.9375 305.203125Q391.84375 237.375 449.078125 198.75Q506.3125 160.125 590.03125 160.125Q675.84375 160.125 739.203125 198.40625Q802.5625 236.6875 823.75 316.375H1046.34375Q1028.46875 208.40625 960.5 133.109375Q892.53125 57.8125 796.28125 18.90625Q700.03125 -20 595.34375 -20ZM334.4375 612.25H820.21875Q820.21875 686.875 793.84375 747.5625Q767.46875 808.25 714.3125 843.71875Q661.15625 879.1875 580.28125 879.1875Q499.5 879.1875 444.703125 840.203125Q389.90625 801.21875 361.9375 739.828125Q333.96875 678.4375 334.4375 612.25Z"/></g></svg><span>The background is built from your image.</span></p>
   <div class="top-actions">
     <p class="size" id="sizeOut"></p>
     <div class="share-wrap">
@@ -1243,6 +1248,11 @@
     bucket: 'matte-shares'
   };
 
+  // A page opened from disk has no origin, so the browser refuses any
+  // cross-origin request before it is sent. Nothing to do with Supabase, and
+  // no amount of retrying will help, so the button says so instead of failing.
+  var LOCAL_FILE = location.protocol === 'file:';
+
   function shareBase() {
     return (location.protocol === 'https:' || location.protocol === 'http:')
       ? location.origin + location.pathname.replace(/index\.html$/, '')
@@ -1325,8 +1335,15 @@
         },
         body: blob
       }).then(function (res) {
-        if (!res.ok) throw new Error('upload failed ' + res.status);
-        return shareBase() + 'view.html?i=' + name;
+        if (res.ok) return shareBase() + 'view.html?i=' + name;
+        return res.text().then(function (body) {
+          var detail = body;
+          try {
+            var parsed = JSON.parse(body);
+            detail = parsed.message || parsed.error || body;
+          } catch (e) { /* not JSON, use the raw body */ }
+          throw new Error(res.status + ' ' + detail);
+        });
       });
     }).then(function (link) {
       el.makeLink.hidden = true;
@@ -1336,12 +1353,38 @@
       el.shareNote.textContent = 'Anyone with this link can see and download the image.';
       el.linkField.focus();
       el.linkField.select();
-    })['catch'](function () {
+    })['catch'](function (err) {
       el.makeLink.disabled = false;
       el.makeLink.textContent = 'Create a link';
-      el.shareNote.textContent = 'That upload did not go through. Your image is untouched, and Export still works.';
+
+      var why = (err && err.message) ? err.message : 'the request did not complete';
+      var hint =
+          LOCAL_FILE
+        ? 'This page is open from disk. Upload it to your site and try again.'
+        : /failed to fetch|networkerror|load failed/i.test(why)
+        ? 'The request never reached Supabase. Usually no connection, an ' +
+          'extension blocking supabase.co, or the page not being served over https.'
+        : /bucket not found/i.test(why)
+        ? 'The storage bucket does not exist yet. Run supabase-setup.sql in the Supabase SQL editor.'
+        : /row-level security|not authorized|401|403/i.test(why)
+        ? 'Storage refused the upload. Check the insert policy in supabase-setup.sql was created.'
+        : /mime|content type/i.test(why)
+        ? 'Storage rejected the file type. The bucket must allow image/png.'
+        : /exceeded|too large|413/i.test(why)
+        ? 'The image is over the 8 MB limit. Reduce the padding or the canvas size.'
+        : 'Export still works, and your image is untouched.';
+
+      el.shareNote.textContent = hint + ' (' + why + ')';
     });
   });
+
+  if (LOCAL_FILE) {
+    el.makeLink.disabled = true;
+    el.makeLink.textContent = 'Create a link (needs hosting)';
+    el.shareNote.textContent = 'Links need this page served over http or https. ' +
+      'Opened straight from a file the browser blocks the upload, because a ' +
+      'file has no origin to send. Everything else on this menu still works.';
+  }
 
   el.copyLink.addEventListener('click', function () {
     el.linkField.select();
