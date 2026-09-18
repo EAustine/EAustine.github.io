@@ -451,6 +451,15 @@
 
   var NAME = 'Matte';
   var SCALE = 2;              // export at 2x for retina
+  var MAX_EXPORT = 4096;      // ceiling on the long edge of the exported file
+  var UPLOAD_MAX = 8 * 1024 * 1024;
+
+  // 2x is right for a screenshot of a window. It is not right for a photograph
+  // that has already been scaled down to fit MAX_SOURCE, where doubling only
+  // inflates the file. Cap the long edge and let small images keep their 2x.
+  function exportScale(L) {
+    return Math.min(SCALE, MAX_EXPORT / Math.max(L.w, L.h));
+  }
   var MAX_SOURCE = 2600;      // downscale monsters before doing anything else
 
   var el = {
@@ -739,15 +748,16 @@
     if (showPick === undefined) showPick = true;
     var L = layout();
 
-    el.canvas.width = L.w * SCALE;
-    el.canvas.height = L.h * SCALE;
+    var S = exportScale(L);
+    el.canvas.width = Math.round(L.w * S);
+    el.canvas.height = Math.round(L.h * S);
     // Width in pixels with height auto: max-width and max-height can then
     // shrink it to fit while the browser keeps the ratio. Setting both in
     // pixels lets the two maxima squash it independently.
     el.canvas.style.width = L.w + 'px';
     el.canvas.style.height = 'auto';
 
-    ctx.setTransform(SCALE, 0, 0, SCALE, 0, 0);
+    ctx.setTransform(S, 0, 0, S, 0, 0);
     ctx.clearRect(0, 0, L.w, L.h);
 
     var fill = background(L.w, L.h);
@@ -775,7 +785,7 @@
 
     drawEmoji(showPick);
 
-    el.sizeOut.textContent = (L.w * SCALE) + ' × ' + (L.h * SCALE) + ' px';
+    el.sizeOut.textContent = el.canvas.width + ' × ' + el.canvas.height + ' px';
     applyView(L);
     refreshBar();
   }
@@ -1259,18 +1269,35 @@
       : 'https://eaustine.github.io/matte/';
   }
 
-  function shotBlob() {
+  function shotBlob(fitUpload) {
     return new Promise(function (resolve) {
       draw(false);                     // no selection marker in the output
-      el.canvas.toBlob(function (blob) { draw(); resolve(blob); }, 'image/png');
+      el.canvas.toBlob(function (png) {
+        if (!fitUpload || !png || png.size <= UPLOAD_MAX) {
+          draw();
+          resolve({ blob: png, type: 'image/png', ext: 'png' });
+          return;
+        }
+        // PNG is lossless, which is exactly wrong for a photograph. WebP at
+        // this quality is visually the same and a fraction of the weight.
+        el.canvas.toBlob(function (webp) {
+          draw();
+          resolve(webp && webp.size < png.size
+            ? { blob: webp, type: 'image/webp', ext: 'webp' }
+            : { blob: png, type: 'image/png', ext: 'png' });
+        }, 'image/webp', 0.92);
+      }, 'image/png');
     });
   }
 
-  function randomName() {
+  function mb(bytes) { return (bytes / 1048576).toFixed(1) + ' MB'; }
+
+  function randomName(ext) {
     var b = new Uint8Array(16);
     if (window.crypto && crypto.getRandomValues) crypto.getRandomValues(b);
     else for (var i = 0; i < 16; i++) b[i] = Math.floor(Math.random() * 256);
-    return [].map.call(b, function (v) { return v.toString(16).padStart(2, '0'); }).join('') + '.png';
+    return [].map.call(b, function (v) { return v.toString(16).padStart(2, '0'); }).join('') +
+           '.' + (ext || 'png');
   }
 
   function closeMenu() {
@@ -1291,8 +1318,8 @@
   var canShareFiles = !!(navigator.canShare && navigator.share);
   el.shareFile.hidden = !canShareFiles;
   el.shareFile.addEventListener('click', function () {
-    shotBlob().then(function (blob) {
-      var file = new File([blob], 'matte.png', { type: 'image/png' });
+    shotBlob().then(function (shot) {
+      var file = new File([shot.blob], 'matte.png', { type: 'image/png' });
       if (!navigator.canShare({ files: [file] })) {
         el.shareFile.textContent = 'This browser will not share files';
         return;
@@ -1306,8 +1333,8 @@
   var canCopyImage = !!(window.ClipboardItem && navigator.clipboard && navigator.clipboard.write);
   el.copyImage.hidden = !canCopyImage;
   el.copyImage.addEventListener('click', function () {
-    shotBlob().then(function (blob) {
-      navigator.clipboard.write([new window.ClipboardItem({ 'image/png': blob })])
+    shotBlob().then(function (shot) {
+      navigator.clipboard.write([new window.ClipboardItem({ 'image/png': shot.blob })])
         .then(function () {
           el.copyImage.textContent = 'Copied';
           setTimeout(function () { el.copyImage.textContent = 'Copy image'; }, 2000);
@@ -1323,17 +1350,21 @@
     el.makeLink.disabled = true;
     el.makeLink.textContent = 'Uploading…';
 
-    shotBlob().then(function (blob) {
-      var name = randomName();
+    shotBlob(true).then(function (shot) {
+      if (!shot.blob) throw new Error('the image could not be encoded');
+      if (shot.blob.size > UPLOAD_MAX) {
+        throw new Error('still ' + mb(shot.blob.size) + ' after compressing');
+      }
+      var name = randomName(shot.ext);
       return fetch(SHARE.url + '/storage/v1/object/' + SHARE.bucket + '/' + name, {
         method: 'POST',
         headers: {
           'apikey': SHARE.key,
           'Authorization': 'Bearer ' + SHARE.key,
-          'Content-Type': 'image/png',
+          'Content-Type': shot.type,
           'x-upsert': 'false'
         },
-        body: blob
+        body: shot.blob
       }).then(function (res) {
         if (res.ok) return shareBase() + 'view.html?i=' + name;
         return res.text().then(function (body) {
@@ -1370,8 +1401,9 @@
         ? 'Storage refused the upload. Check the insert policy in supabase-setup.sql was created.'
         : /mime|content type/i.test(why)
         ? 'Storage rejected the file type. The bucket must allow image/png.'
-        : /exceeded|too large|413/i.test(why)
-        ? 'The image is over the 8 MB limit. Reduce the padding or the canvas size.'
+        : /exceeded|too large|413|still .* after compressing/i.test(why)
+        ? 'Even compressed this is over the 8 MB limit. Export still gives you the ' +
+          'full-quality file.'
         : 'Export still works, and your image is untouched.';
 
       el.shareNote.textContent = hint + ' (' + why + ')';

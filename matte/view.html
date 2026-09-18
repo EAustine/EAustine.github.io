@@ -128,7 +128,7 @@
   // The name comes off the URL, so it is checked against the exact shape this
   // app generates before being put into a path. Anything else is not a link
   // Matte made.
-  if (!/^[a-f0-9]{32}\.png$/.test(name)) {
+  if (!/^[a-f0-9]{32}\.(png|webp)$/.test(name)) {
     fail('That link is not complete',
          'It may have been cut short when it was pasted. Ask for the whole link, or make your own image.');
     return;
@@ -138,7 +138,8 @@
 
   // Supabase sets Content-Disposition when ?download is present, so the button
   // is a plain link and never has to fetch the file across origins.
-  el.download.href = url + '?download=matte.png';
+  var ext = name.slice(name.lastIndexOf('.') + 1);
+  el.download.href = url + '?download=matte.' + ext;
 
   el.shot.onload = function () {
     el.state.hidden = true;
