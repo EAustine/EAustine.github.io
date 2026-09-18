@@ -236,6 +236,36 @@
   .btn[disabled]{background:var(--card);color:#a8a8b0;cursor:not-allowed;box-shadow:0 1px 2px rgba(20,20,30,.08)}
 
   .emoji-grid{display:grid;grid-template-columns:repeat(8,1fr);gap:4px;margin-bottom:6px}
+  #textInput{
+    width:100%;padding:11px 12px;margin-bottom:14px;
+    border:1px solid var(--edge);border-radius:9px;background:var(--track);
+    color:var(--ink);font-family:inherit;font-size:14px;line-height:1.45;resize:vertical;
+  }
+  #textInput:focus-visible{outline:2px solid var(--ink);outline-offset:1px}
+  #textColours{grid-template-columns:repeat(7,1fr);gap:5px;margin-bottom:6px}
+  #addText{width:100%;box-shadow:none;border-color:var(--ink)}
+
+  .text-row{display:flex;gap:6px;margin-bottom:14px}
+  .text-row .choices{flex:1;grid-template-columns:repeat(3,1fr)}
+  .tog{
+    appearance:none;width:38px;flex:0 0 38px;border:0;border-radius:9px;
+    background:var(--track);color:var(--muted);font-size:15px;cursor:pointer;
+  }
+  .tog:hover{color:var(--ink)}
+  .tog[aria-pressed="true"]{background:var(--ink);color:#fff}
+  .tog:focus-visible{outline:2px solid var(--ink);outline-offset:1px}
+  #textBold{font-weight:700}
+  #textItalic{font-family:Georgia,serif;font-style:italic}
+
+  /* The primary action stays reachable without scrolling the panel, which
+     matters most on a phone where the list of colours is taller than the
+     space above the keyboard. */
+  .pop-foot{
+    position:sticky;bottom:-18px;z-index:1;
+    margin:10px -18px -18px;padding:10px 18px 18px;
+    background:var(--card);border-radius:0 0 14px 14px;
+  }
+
   .emoji-grid{grid-template-columns:repeat(6,1fr);gap:5px}
   .emoji-grid button{
     appearance:none;border:0;border-radius:9px;background:transparent;
@@ -248,6 +278,10 @@
   .note{margin:12px 0 0;font-size:12px;line-height:1.55;color:var(--muted)}
 
   @media (max-width:720px){
+    /* Under 16px, iOS zooms the page when the field takes focus. */
+    #textInput{font-size:16px}
+    .tog{width:42px;flex:0 0 42px}
+
     /* Anchored to the button, the menu hangs off the left edge, because Share
        is not the rightmost control. Pin it to the viewport instead. */
     .menu{position:fixed;top:56px;left:12px;right:12px;width:auto;max-width:none}
@@ -394,6 +428,29 @@
     corner to resize, and tap the cross to remove it.</p>
   </div>
 
+  <div class="pop" id="popText" hidden>
+    <h2 id="textTitle">Text</h2>
+    <textarea id="textInput" rows="2" placeholder="Type something" maxlength="220"></textarea>
+
+    <div class="text-row">
+      <div class="choices" id="textFont">
+        <button type="button" data-font="sans" aria-pressed="true">Sans</button>
+        <button type="button" data-font="serif" aria-pressed="false">Serif</button>
+        <button type="button" data-font="mono" aria-pressed="false">Mono</button>
+      </div>
+      <button class="tog" id="textBold" type="button" aria-pressed="false"
+              aria-label="Bold">B</button>
+      <button class="tog" id="textItalic" type="button" aria-pressed="false"
+              aria-label="Italic">I</button>
+    </div>
+
+    <div class="swatches" id="textColours"></div>
+
+    <div class="pop-foot">
+      <button class="btn ghost" id="addText" type="button">Add to image</button>
+    </div>
+  </div>
+
   <div class="pop" id="popShape" hidden>
     <h2>Shape</h2>
     <div class="choices five" id="ratioChoices">
@@ -431,6 +488,7 @@
       Shape <span class="val" id="shapeVal">Auto</span>
     </button>
     <button class="seg" id="segAdjust" type="button" aria-expanded="false">Adjust</button>
+    <button class="seg" id="segText" type="button" aria-expanded="false">Text</button>
     <button class="seg" id="segEmoji" type="button" aria-expanded="false">Emoji</button>
     <span class="rule"></span>
     <div class="zoom">
@@ -521,6 +579,15 @@
     popShape: document.getElementById('popShape'),
     popAdjust: document.getElementById('popAdjust'),
     segEmoji: document.getElementById('segEmoji'),
+    segText: document.getElementById('segText'),
+    popText: document.getElementById('popText'),
+    textTitle: document.getElementById('textTitle'),
+    textInput: document.getElementById('textInput'),
+    textColours: document.getElementById('textColours'),
+    textFont: document.getElementById('textFont'),
+    textBold: document.getElementById('textBold'),
+    textItalic: document.getElementById('textItalic'),
+    addText: document.getElementById('addText'),
     popEmoji: document.getElementById('popEmoji'),
     emojiGrid: document.getElementById('emojiGrid'),
     problem: document.getElementById('problem')
@@ -534,7 +601,7 @@
 
   var state = {
     img: null, ratio: 'auto', palette: null,
-    emoji: [], picked: -1,
+    items: [], picked: -1,
     bg: 'auto', autoVariant: 'soft',
     solid: '#2a2f3a',
     grad: { a: '#3a4a6b', b: '#141a26', angle: 135 }
@@ -839,8 +906,8 @@
     img.src = row[2];
     EMOJI_IMG[row[0]] = img;
   });
-  var HANDLE = 19;          // resize grip, in screen pixels
-  var BADGE = 28;           // remove badge, in screen pixels
+  var HANDLE = 26;          // resize grip, in screen pixels
+  var BADGE = 36;           // remove badge, in screen pixels
   var MIN_EMOJI = 16;
 
   function displayScale() {
@@ -856,37 +923,84 @@
     return { min: MIN_EMOJI, max: Math.round(Math.min(L.w, L.h) * 0.9) };
   }
 
+  // System stacks rather than more webfonts. The canvas renders with whatever
+  // the machine has, so what someone sees is what they export, and the page
+  // does not grow a dependency for each extra face.
+  var FAMILIES = {
+    sans: '"Public Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif',
+    serif: 'Georgia,"Iowan Old Style","Times New Roman",Times,serif',
+    mono: 'ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace'
+  };
+
+  function fontFor(it) {
+    return (it.italic ? 'italic ' : '') + (it.bold ? '600 ' : '400 ') +
+           it.size + 'px ' + (FAMILIES[it.font] || FAMILIES.sans);
+  }
+
+  // Emoji are square. Text is as wide as its longest line and as tall as the
+  // number of lines, so everything that draws or hits an item asks here rather
+  // than assuming a square.
+  function metrics(it) {
+    if (it.kind !== 'text') return { hw: it.size / 2, hh: it.size / 2 };
+    var lines = String(it.text || ' ').split(/\r?\n/);
+    var lh = it.size * 1.24;
+    ctx.save();
+    ctx.font = fontFor(it);
+    var w = 0;
+    lines.forEach(function (line) {
+      w = Math.max(w, ctx.measureText(line || ' ').width);
+    });
+    ctx.restore();
+    return { hw: Math.max(w, it.size * 0.4) / 2, hh: lines.length * lh / 2, lines: lines, lh: lh };
+  }
+
   // Where the remove badge and the resize grip sit, in canvas coordinates.
   // Sizes are divided by the display scale so both stay the same size on
   // screen at any zoom, and both are pulled inside the canvas when the emoji
   // sits against an edge, otherwise the control would be unreachable.
   function controls(e) {
-    var s = displayScale(), L = layout();
-    var half = e.size * 0.5;
-    var b = BADGE / s, g = HANDLE / s;
+    var s = displayScale(), L = layout(), m = metrics(e);
+
+    // Constant screen size is right until the item is smaller than the
+    // controls themselves, which happens to a modest emoji on a photo viewed
+    // at 15%. Shrink them toward a floor so they annotate rather than smother.
+    var onScreen = Math.min(m.hw, m.hh) * 2 * s;
+    var k = Math.max(0.55, Math.min(1, onScreen * 0.55 / BADGE));
+
+    var b = BADGE * k / s, g = HANDLE * k / s;
     return {
-      s: s, half: half, b: b, g: g,
-      rx: Math.min(e.x + half, L.w - b / 2), ry: Math.max(e.y - half, b / 2),
-      hx: Math.min(e.x + half, L.w - g / 2), hy: Math.min(e.y + half, L.h - g / 2)
+      s: s, hw: m.hw, hh: m.hh, b: b, g: g,
+      rx: Math.min(e.x + m.hw, L.w - b / 2), ry: Math.max(e.y - m.hh, b / 2),
+      hx: Math.min(e.x + m.hw, L.w - g / 2), hy: Math.min(e.y + m.hh, L.h - g / 2)
     };
   }
 
   function onHandle(p, e) {
     var c = controls(e);
-    var slop = (HANDLE / 2 + 12) / c.s;
+    var slop = c.g / 2 + 13 / c.s;
     return Math.abs(p.x - c.hx) <= slop && Math.abs(p.y - c.hy) <= slop;
   }
 
   function onRemove(p, e) {
     var c = controls(e);
-    var slop = (BADGE / 2 + 8) / c.s;
+    var slop = c.b / 2 + 10 / c.s;
     return Math.abs(p.x - c.rx) <= slop && Math.abs(p.y - c.ry) <= slop;
   }
 
   function drawEmoji(showPick) {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    state.emoji.forEach(function (e, i) {
+    state.items.forEach(function (e, i) {
+      if (e.kind === 'text') {
+        var tm = metrics(e);
+        ctx.font = fontFor(e);
+        ctx.fillStyle = e.color;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        tm.lines.forEach(function (line, n) {
+          ctx.fillText(line, e.x, e.y - tm.hh + tm.lh * (n + 0.5));
+        });
+      } else {
       var img = EMOJI_IMG[e.ch];
       if (img && img.complete && img.naturalWidth) {
         ctx.drawImage(img, e.x - e.size / 2, e.y - e.size / 2, e.size, e.size);
@@ -895,6 +1009,7 @@
         // glyph stands in until the decode finishes, or for good if it fails.
         ctx.font = e.size + 'px ' + EMOJI_FONT;
         ctx.fillText(e.ch, e.x, e.y);
+      }
       }
       // The marker is never in the export: draw() is called once with it off
       // before the canvas is read.
@@ -908,12 +1023,12 @@
         ctx.setLineDash([]);
         ctx.lineWidth = 3 / c.s;
         ctx.strokeStyle = 'rgba(255,255,255,.92)';
-        ctx.strokeRect(e.x - c.half, e.y - c.half, c.half * 2, c.half * 2);
+        ctx.strokeRect(e.x - c.hw, e.y - c.hh, c.hw * 2, c.hh * 2);
 
         ctx.lineWidth = 1.5 / c.s;
         ctx.strokeStyle = 'rgba(0,0,0,.72)';
         ctx.setLineDash([6 / c.s, 5 / c.s]);
-        ctx.strokeRect(e.x - c.half, e.y - c.half, c.half * 2, c.half * 2);
+        ctx.strokeRect(e.x - c.hw, e.y - c.hh, c.hw * 2, c.hh * 2);
         ctx.setLineDash([]);
 
         // Both controls get a shadow so they lift off whatever is behind them.
@@ -935,8 +1050,8 @@
         ctx.shadowBlur = 0;
         ctx.shadowOffsetY = 0;
 
-        ctx.lineWidth = 1.75 / c.s;
-        ctx.strokeStyle = 'rgba(0,0,0,.82)';
+        ctx.lineWidth = 2 / c.s;
+        ctx.strokeStyle = 'rgba(0,0,0,.85)';
         ctx.beginPath();
         ctx.arc(c.rx, c.ry, c.b / 2, 0, Math.PI * 2);
         ctx.stroke();
@@ -968,10 +1083,10 @@
     });
   }
 
-  function emojiAt(x, y) {
-    for (var i = state.emoji.length - 1; i >= 0; i--) {
-      var e = state.emoji[i];
-      if (Math.abs(x - e.x) <= e.size * 0.5 && Math.abs(y - e.y) <= e.size * 0.5) return i;
+  function itemAt(x, y) {
+    for (var i = state.items.length - 1; i >= 0; i--) {
+      var e = state.items[i], m = metrics(e);
+      if (Math.abs(x - e.x) <= m.hw && Math.abs(y - e.y) <= m.hh) return i;
     }
     return -1;
   }
@@ -1000,11 +1115,11 @@
       b.addEventListener('click', function () {
         if (!state.img) return;
         var L = layout();
-        state.emoji.push({
+        state.items.push({
           ch: ch, x: L.w / 2, y: L.h / 2,
           size: Math.round(Math.min(L.w, L.h) * 0.16)
         });
-        state.picked = state.emoji.length - 1;
+        state.picked = state.items.length - 1;
             draw();
       });
       el.emojiGrid.appendChild(b);
@@ -1019,7 +1134,7 @@
 
     // The handle belongs to whatever is already selected, and it wins over a
     // hit on the emoji body so the corner is always grabbable.
-    var cur = state.emoji[state.picked];
+    var cur = state.items[state.picked];
 
     if (cur && onRemove(p, cur)) {
       removePicked();
@@ -1028,23 +1143,27 @@
     }
 
     if (cur && onHandle(p, cur)) {
+      var cm = metrics(cur);
       dragging = { mode: 'size', from: cur.size,
-                   grab: Math.max(Math.abs(p.x - cur.x), Math.abs(p.y - cur.y)) };
+                   grab: Math.max(Math.abs(p.x - cur.x) * (cm.hh / Math.max(cm.hw, 1)),
+                                  Math.abs(p.y - cur.y)) };
       el.canvas.setPointerCapture(ev.pointerId);
       ev.preventDefault();
       return;
     }
 
-    var hit = emojiAt(p.x, p.y);
+    var hit = itemAt(p.x, p.y);
     state.picked = hit;
+    if (hit < 0 && openPop === 'Text') loadText(null);
 
     if (hit >= 0) {
-      var e = state.emoji[hit];
+      var e = state.items[hit];
       dragging = { mode: 'move', dx: p.x - e.x, dy: p.y - e.y };
       el.canvas.setPointerCapture(ev.pointerId);
       ev.preventDefault();
-      // Selecting no longer opens a panel. Everything needed to change this
-      // emoji is drawn on it, which works the same with a mouse or a thumb.
+      // An emoji opens nothing: everything it needs is drawn on it. Text is
+      // the exception, because the words can only be changed with a keyboard.
+      if (e.kind === 'text') { loadText(e); setPop('Text'); }
     }
     draw();
   });
@@ -1057,10 +1176,12 @@
   el.canvas.addEventListener('pointermove', function (ev) {
     if (!dragging || state.picked < 0) return;
     var p = canvasPoint(ev);
-    var e = state.emoji[state.picked];
+    var e = state.items[state.picked];
 
     if (dragging.mode === 'size') {
-      var reach = Math.max(Math.abs(p.x - e.x), Math.abs(p.y - e.y));
+      var mm = metrics(e);
+      var reach = Math.max(Math.abs(p.x - e.x) * (mm.hh / Math.max(mm.hw, 1)),
+                           Math.abs(p.y - e.y));
       var r = sizeRange();
       // Scale by how much further the corner has been pulled, so the emoji
       // does not jump when the grab starts away from the exact handle centre.
@@ -1080,16 +1201,16 @@
   el.canvas.addEventListener('pointermove', function (ev) {
     if (dragging || !state.img) return;
     var p = canvasPoint(ev);
-    var cur = state.emoji[state.picked];
+    var cur = state.items[state.picked];
     el.canvas.style.cursor =
         (cur && onRemove(p, cur)) ? 'pointer'
       : (cur && onHandle(p, cur)) ? 'nwse-resize'
-      : (emojiAt(p.x, p.y) >= 0 ? 'grab' : 'default');
+      : (itemAt(p.x, p.y) >= 0 ? 'grab' : 'default');
   });
 
   function removePicked() {
     if (state.picked < 0) return;
-    state.emoji.splice(state.picked, 1);
+    state.items.splice(state.picked, 1);
     state.picked = -1;
     draw();
   }
@@ -1101,6 +1222,110 @@
       ev.preventDefault();
       removePicked();
     }
+  });
+
+  /* ---------- text ---------- */
+
+  // Generated the same way as the background palette: one row of neutrals,
+  // then the same seven hues twice, once dark enough to sit on a pale image
+  // and once light enough to sit on a dark one. Twenty one swatches, three
+  // exact rows of seven, then whatever was pulled out of the picture.
+  var TEXT_HUES = [358, 26, 44, 142, 190, 222, 280];
+  var TEXT_BASE = ['#ffffff', '#e4e4e7', '#a1a1aa', '#52525b', '#27272a', '#17171a', '#000000']
+    // 34, not 50: at half lightness yellow and cyan are too pale to read
+    // on a white screenshot. Every hue clears 3:1 here.
+    .concat(TEXT_HUES.map(function (h) { return hslHex(h, 74, 34); }))
+    .concat(TEXT_HUES.map(function (h) { return hslHex(h, 66, 78); }));
+
+  var textDraft = { color: '#ffffff', bold: false, italic: false, font: 'sans' };
+
+  function textPalette() {
+    var mine = (state.palette && state.palette.swatches) || [];
+    return TEXT_BASE.concat(mine.slice(0, 3));
+  }
+
+  function paintTextColours() {
+    el.textColours.innerHTML = '';
+    var live = textTarget();
+    textPalette().forEach(function (hex) {
+      swatch(el.textColours, hex, live.color === hex, function () {
+        live.color = hex;
+        if (live !== textDraft) textDraft.color = hex;
+        draw();
+      }, hex);
+    });
+  }
+
+  function syncStyle(it) {
+    el.textBold.setAttribute('aria-pressed', it.bold ? 'true' : 'false');
+    el.textItalic.setAttribute('aria-pressed', it.italic ? 'true' : 'false');
+    [].forEach.call(el.textFont.children, function (b) {
+      b.setAttribute('aria-pressed',
+        b.getAttribute('data-font') === (it.font || 'sans') ? 'true' : 'false');
+    });
+  }
+
+  // Whichever is being edited: the selected item, or the draft used for the
+  // next one added.
+  function textTarget() {
+    var it = state.items[state.picked];
+    return (it && it.kind === 'text') ? it : textDraft;
+  }
+
+  // Selecting a text item does open this panel, unlike an emoji. Size and
+  // remove live on the canvas, but the words themselves need a keyboard, and
+  // there is nowhere else to put one.
+  function loadText(item) {
+    var editing = item && item.kind === 'text';
+    el.textTitle.textContent = editing ? 'Edit text' : 'Text';
+    el.addText.hidden = !!editing;
+    el.textInput.value = editing ? item.text : '';
+    syncStyle(editing ? item : textDraft);
+    paintTextColours();
+  }
+
+  el.textInput.addEventListener('input', function () {
+    var it = state.items[state.picked];
+    if (it && it.kind === 'text') {
+      it.text = el.textInput.value;
+      draw();
+    }
+  });
+
+  el.textFont.addEventListener('click', function (ev) {
+    var btn = ev.target.closest('button');
+    if (!btn) return;
+    var live = textTarget();
+    live.font = btn.getAttribute('data-font');
+    if (live !== textDraft) textDraft.font = live.font;
+    syncStyle(live);
+    draw();
+  });
+
+  [['textBold', 'bold'], ['textItalic', 'italic']].forEach(function (pair) {
+    el[pair[0]].addEventListener('click', function () {
+      var live = textTarget();
+      live[pair[1]] = !live[pair[1]];
+      if (live !== textDraft) textDraft[pair[1]] = live[pair[1]];
+      syncStyle(live);
+      draw();
+    });
+  });
+
+  el.addText.addEventListener('click', function () {
+    var words = el.textInput.value.replace(/\s+$/, '');
+    if (!words || !state.img) { el.textInput.focus(); return; }
+    var L = layout();
+    state.items.push({
+      kind: 'text', text: words,
+      x: L.w / 2, y: L.h / 2,
+      size: Math.round(Math.min(L.w, L.h) * 0.075),
+      color: textDraft.color, bold: textDraft.bold,
+      italic: textDraft.italic, font: textDraft.font
+    });
+    state.picked = state.items.length - 1;
+    loadText(state.items[state.picked]);
+    draw();
   });
 
   /* ---------- fitting and zoom ---------- */
@@ -1138,6 +1363,17 @@
   el.zoomIn.addEventListener('click', function () { setZoom(view.zoom * 1.25); });
   el.zoomOut.addEventListener('click', function () { setZoom(view.zoom / 1.25); });
   el.zoomFit.addEventListener('click', function () { setZoom(1); });
+
+  // On a phone the dock sits at the bottom and its panels open upward, so an
+  // on-screen keyboard covers exactly the thing being typed into. Lift the
+  // dock by however much the visual viewport shrank.
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', function () {
+      var vv = window.visualViewport;
+      var covered = window.innerHeight - vv.height - vv.offsetTop;
+      el.dock.style.bottom = covered > 80 ? (covered + 12) + 'px' : '';
+    });
+  }
 
   ['resize', 'orientationchange'].forEach(function (ev) {
     window.addEventListener(ev, function () {
@@ -1200,7 +1436,7 @@
         try {
           state.img = shrink(img);
           state.palette = paletteFrom(state.img);
-          state.emoji = []; state.picked = -1;
+          state.items = []; state.picked = -1;
           view.zoom = 1;
           paintSwatches();
           el.drop.hidden = true;
@@ -1433,7 +1669,7 @@
 
   el.reset.addEventListener('click', function () {
     state.img = null; state.palette = null;
-    state.emoji = []; state.picked = -1; view.zoom = 1;
+    state.items = []; state.picked = -1; view.zoom = 1;
     closeMenu();
     el.linkOut.hidden = true;
     el.makeLink.hidden = false;
@@ -1490,7 +1726,7 @@
      One popover open at a time, opening upward so the canvas stays in view.
      Each segment carries a live summary, so the current background reads off
      the bar without opening anything. */
-  var POPS = ['Background', 'Emoji', 'Shape', 'Adjust'];
+  var POPS = ['Background', 'Text', 'Emoji', 'Shape', 'Adjust'];
   var openPop = null;
 
   function setPop(name) {
@@ -1507,6 +1743,7 @@
     el['seg' + p].addEventListener('click', function (e) {
       e.stopPropagation();
       showPop(p);
+      if (p === 'Text' && openPop === 'Text') loadText(state.items[state.picked]);
     });
     el['pop' + p].addEventListener('click', function (e) { e.stopPropagation(); });
   });
@@ -1675,12 +1912,13 @@
 
   EMOJI.forEach(function (row) {
     EMOJI_IMG[row[0]].addEventListener('load', function () {
-      if (state.img && state.emoji.length) draw();
+      if (state.img && state.items.length) draw();
     });
   });
 
   paintSwatches();
   paintEmojiGrid();
+  paintTextColours();
   showPane();
   refreshBar();
 })();
