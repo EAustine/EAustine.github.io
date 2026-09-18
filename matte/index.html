@@ -6,7 +6,7 @@
 
 <!-- Working title. The name lives here and in the NAME constant in the script. -->
 <title>Matte — drop a screenshot, get a background</title>
-<meta name="description" content="Drop or paste a screenshot and Matte builds the background out of the image's own colours. Nothing leaves your browser.">
+<meta name="description" content="Drop or paste a screenshot and Matte builds the background out of the image's own colours. It all happens in your browser.">
 <meta name="theme-color" content="#cbcbd1">
 
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
@@ -65,6 +65,36 @@
   .brand .mark{display:block;height:19px;width:auto}
   .brand span{display:block;font-size:11.5px;font-weight:400;color:var(--muted);margin-top:4px;max-width:34ch;line-height:1.4}
   .top-actions{display:flex;align-items:center;gap:8px}
+  .share-wrap{position:relative}
+
+  .menu{
+    position:absolute;top:calc(100% + 8px);right:0;z-index:6;
+    width:min(320px,calc(100vw - 28px));
+    background:var(--card);border-radius:12px;box-shadow:var(--shadow);padding:6px;
+  }
+  .menu-item{
+    display:block;width:100%;appearance:none;font:inherit;font-size:13.5px;text-align:left;
+    padding:10px 12px;border:0;border-radius:8px;background:transparent;color:var(--ink);cursor:pointer;
+  }
+  .menu-item:hover{background:var(--track)}
+  .menu-item:focus-visible{outline:2px solid var(--ink);outline-offset:-2px}
+  .menu-item[disabled]{color:var(--muted);cursor:default;background:transparent}
+
+  .linkout{display:flex;gap:6px;padding:6px 6px 2px}
+  .linkout input{
+    flex:1;min-width:0;padding:9px 10px;border:1px solid var(--edge);border-radius:8px;
+    background:var(--track);color:var(--ink);font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+    font-size:11.5px;
+  }
+  .linkout input:focus-visible{outline:2px solid var(--ink);outline-offset:1px}
+  .mini{
+    appearance:none;font:inherit;font-size:12.5px;font-weight:500;padding:9px 11px;
+    border:1px solid var(--edge);border-radius:8px;background:transparent;color:var(--ink);
+    cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;
+  }
+  .mini:hover{background:var(--track)}
+
+  .menu-note{margin:8px 12px 6px;font-size:11.5px;line-height:1.5;color:var(--muted)}
   .size{margin:0 6px 0 0;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11.5px;color:var(--muted)}
 
   /* ---------- stage ---------- */
@@ -256,7 +286,24 @@
   <p class="brand"><img class="mark" src="wordmark.svg" alt="Matte" width="420" height="98"><span>The background is built from your image.</span></p>
   <div class="top-actions">
     <p class="size" id="sizeOut"></p>
-    <button class="btn ghost" id="copy" type="button" disabled>Copy</button>
+    <div class="share-wrap">
+      <button class="btn ghost" id="share" type="button" disabled aria-expanded="false">Share</button>
+
+      <div class="menu" id="shareMenu" hidden>
+        <button class="menu-item" id="shareFile" type="button" hidden>Share image…</button>
+        <button class="menu-item" id="copyImage" type="button" hidden>Copy image</button>
+        <button class="menu-item" id="makeLink" type="button">Create a link</button>
+
+        <div class="linkout" id="linkOut" hidden>
+          <input id="linkField" readonly aria-label="Share link">
+          <button class="mini" id="copyLink" type="button">Copy</button>
+          <a class="mini" id="openLink" target="_blank" rel="noopener">Open</a>
+        </div>
+
+        <p class="menu-note" id="shareNote">A link uploads this image so other
+        people can open it. Everything else here stays on your device.</p>
+      </div>
+    </div>
     <button class="btn" id="download" type="button" disabled>Export</button>
   </div>
 </header>
@@ -269,7 +316,8 @@
     <h1>Drop a screenshot here</h1>
     <p>Or press <span class="kbd">V</span> with one on your clipboard. That is
     usually the fastest way.</p>
-    <p>It never leaves your browser.</p>
+    <p>Everything happens in your browser. Nothing is uploaded unless you
+    ask for a share link.</p>
     <button type="button" id="pickBtn">Choose a file</button>
     <input type="file" id="file" accept="image/*" class="offscreen">
     <p class="problem" id="problem" hidden></p>
@@ -431,7 +479,16 @@
     shadow: document.getElementById('shadow'),
     shadowOut: document.getElementById('shadowOut'),
     download: document.getElementById('download'),
-    copy: document.getElementById('copy'),
+    share: document.getElementById('share'),
+    shareMenu: document.getElementById('shareMenu'),
+    shareFile: document.getElementById('shareFile'),
+    copyImage: document.getElementById('copyImage'),
+    makeLink: document.getElementById('makeLink'),
+    linkOut: document.getElementById('linkOut'),
+    linkField: document.getElementById('linkField'),
+    copyLink: document.getElementById('copyLink'),
+    openLink: document.getElementById('openLink'),
+    shareNote: document.getElementById('shareNote'),
     reset: document.getElementById('reset'),
     sizeOut: document.getElementById('sizeOut'),
     live: document.getElementById('live'),
@@ -1134,7 +1191,7 @@
           el.drop.hidden = true;
           el.canvas.hidden = false;
           el.dock.hidden = false;
-          [el.download, el.copy, el.reset].forEach(function (b) { b.disabled = false; });
+          [el.download, el.share, el.reset].forEach(function (b) { b.disabled = false; });
           draw();
         } catch (err) {
           el.drop.hidden = false;
@@ -1175,37 +1232,144 @@
     }, 'image/png');
   });
 
-  el.copy.addEventListener('click', function () {
-    // Clipboard images need a secure context and a supporting browser, so this
-    // says what happened either way rather than doing nothing.
-    if (!(window.ClipboardItem && navigator.clipboard && navigator.clipboard.write)) {
-      el.copy.textContent = 'Use Download instead';
-      setTimeout(function () { el.copy.textContent = 'Copy image'; }, 2400);
-      return;
-    }
-    draw(false);
-    el.canvas.toBlob(function (blob) {
-      draw();
+  /* ---------- sharing ----------
+     Three routes, in order of how little they give away. The native sheet and
+     the clipboard never leave the device. A link has to upload, so it is a
+     separate, explicit choice and the menu says so. */
+
+  var SHARE = {
+    url: 'https://tmaukbgdkkqcbwqgrmje.supabase.co',
+    key: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRtYXVrYmdka2txY2J3cWdybWplIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgxOTEwMDksImV4cCI6MjEwMzc2NzAwOX0.bHY8hNm35EtsDxSIibm8c06jxGX-oS_5UEAZN1XzDSc',
+    bucket: 'matte-shares'
+  };
+
+  function shareBase() {
+    return (location.protocol === 'https:' || location.protocol === 'http:')
+      ? location.origin + location.pathname.replace(/index\.html$/, '')
+      : 'https://eaustine.github.io/matte/';
+  }
+
+  function shotBlob() {
+    return new Promise(function (resolve) {
+      draw(false);                     // no selection marker in the output
+      el.canvas.toBlob(function (blob) { draw(); resolve(blob); }, 'image/png');
+    });
+  }
+
+  function randomName() {
+    var b = new Uint8Array(16);
+    if (window.crypto && crypto.getRandomValues) crypto.getRandomValues(b);
+    else for (var i = 0; i < 16; i++) b[i] = Math.floor(Math.random() * 256);
+    return [].map.call(b, function (v) { return v.toString(16).padStart(2, '0'); }).join('') + '.png';
+  }
+
+  function closeMenu() {
+    el.shareMenu.hidden = true;
+    el.share.setAttribute('aria-expanded', 'false');
+  }
+
+  el.share.addEventListener('click', function (ev) {
+    ev.stopPropagation();
+    var open = el.shareMenu.hidden;
+    el.shareMenu.hidden = !open;
+    el.share.setAttribute('aria-expanded', open ? 'true' : 'false');
+  });
+  el.shareMenu.addEventListener('click', function (ev) { ev.stopPropagation(); });
+
+  // Route one: hand the file to the operating system. Best on a phone, and
+  // nothing goes anywhere Matte controls.
+  var canShareFiles = !!(navigator.canShare && navigator.share);
+  el.shareFile.hidden = !canShareFiles;
+  el.shareFile.addEventListener('click', function () {
+    shotBlob().then(function (blob) {
+      var file = new File([blob], 'matte.png', { type: 'image/png' });
+      if (!navigator.canShare({ files: [file] })) {
+        el.shareFile.textContent = 'This browser will not share files';
+        return;
+      }
+      closeMenu();
+      navigator.share({ files: [file] })['catch'](function () {});
+    });
+  });
+
+  // Route two: the clipboard, where the browser allows it.
+  var canCopyImage = !!(window.ClipboardItem && navigator.clipboard && navigator.clipboard.write);
+  el.copyImage.hidden = !canCopyImage;
+  el.copyImage.addEventListener('click', function () {
+    shotBlob().then(function (blob) {
       navigator.clipboard.write([new window.ClipboardItem({ 'image/png': blob })])
         .then(function () {
-          el.copy.textContent = 'Copied';
-          setTimeout(function () { el.copy.textContent = 'Copy image'; }, 2000);
+          el.copyImage.textContent = 'Copied';
+          setTimeout(function () { el.copyImage.textContent = 'Copy image'; }, 2000);
         })['catch'](function () {
-          el.copy.textContent = 'Use Download instead';
-          setTimeout(function () { el.copy.textContent = 'Copy image'; }, 2400);
+          el.copyImage.textContent = 'The browser refused. Use Export.';
+          setTimeout(function () { el.copyImage.textContent = 'Copy image'; }, 3000);
         });
-    }, 'image/png');
+    });
+  });
+
+  // Route three: upload, and only on request.
+  el.makeLink.addEventListener('click', function () {
+    el.makeLink.disabled = true;
+    el.makeLink.textContent = 'Uploading…';
+
+    shotBlob().then(function (blob) {
+      var name = randomName();
+      return fetch(SHARE.url + '/storage/v1/object/' + SHARE.bucket + '/' + name, {
+        method: 'POST',
+        headers: {
+          'apikey': SHARE.key,
+          'Authorization': 'Bearer ' + SHARE.key,
+          'Content-Type': 'image/png',
+          'x-upsert': 'false'
+        },
+        body: blob
+      }).then(function (res) {
+        if (!res.ok) throw new Error('upload failed ' + res.status);
+        return shareBase() + 'view.html?i=' + name;
+      });
+    }).then(function (link) {
+      el.makeLink.hidden = true;
+      el.linkOut.hidden = false;
+      el.linkField.value = link;
+      el.openLink.href = link;
+      el.shareNote.textContent = 'Anyone with this link can see and download the image.';
+      el.linkField.focus();
+      el.linkField.select();
+    })['catch'](function () {
+      el.makeLink.disabled = false;
+      el.makeLink.textContent = 'Create a link';
+      el.shareNote.textContent = 'That upload did not go through. Your image is untouched, and Export still works.';
+    });
+  });
+
+  el.copyLink.addEventListener('click', function () {
+    el.linkField.select();
+    var done = function () {
+      el.copyLink.textContent = 'Copied';
+      setTimeout(function () { el.copyLink.textContent = 'Copy'; }, 2000);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(el.linkField.value).then(done, function () {});
+    } else {
+      try { document.execCommand('copy'); done(); } catch (e) {}
+    }
   });
 
   el.reset.addEventListener('click', function () {
     state.img = null; state.palette = null;
     state.emoji = []; state.picked = -1; view.zoom = 1;
+    closeMenu();
+    el.linkOut.hidden = true;
+    el.makeLink.hidden = false;
+    el.makeLink.disabled = false;
+    el.makeLink.textContent = 'Create a link';
     setPop(null);
     el.canvas.hidden = true;
     el.dock.hidden = true;
     el.drop.hidden = false;
     el.sizeOut.textContent = '';
-    [el.download, el.copy, el.reset].forEach(function (b) { b.disabled = true; });
+    [el.download, el.share, el.reset].forEach(function (b) { b.disabled = true; });
   });
 
   /* ---------- input ---------- */
@@ -1272,9 +1436,11 @@
     el['pop' + p].addEventListener('click', function (e) { e.stopPropagation(); });
   });
 
-  document.addEventListener('click', function () { setPop(null); });
+  document.addEventListener('click', function () { setPop(null); closeMenu(); });
   document.addEventListener('keydown', function (e) {
-    if (e.key === 'Escape' && openPop) setPop(null);
+    if (e.key !== 'Escape') return;
+    if (openPop) setPop(null);
+    closeMenu();
   });
 
   // The bar has to say what it is set to without being opened.
