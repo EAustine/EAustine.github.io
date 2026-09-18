@@ -89,7 +89,7 @@
   }
 
   .drop{
-    width:min(520px,100%);background:var(--card);border-radius:14px;
+    width:min(520px,calc(100vw - 96px));background:var(--card);border-radius:14px;
     box-shadow:var(--shadow);padding:44px 36px;text-align:center;
   }
   .drop h1{font-size:20px;font-weight:600;margin:0 0 10px;letter-spacing:-.015em}
@@ -216,12 +216,38 @@
 
   .note{margin:12px 0 0;font-size:12px;line-height:1.55;color:var(--muted)}
 
-  @media (max-width:640px){
-    .stage{padding:76px 16px 124px}
-    .seg{padding:9px 10px;font-size:12.5px}
-    .seg .val{display:none}
-    .drop{padding:34px 24px}
+  @media (max-width:720px){
+    /* The brand subtitle and the pixel readout both wrap into the buttons on a
+       narrow screen. Neither is needed to use the tool. */
+    .topbar{height:auto;padding:13px 14px;align-items:center}
+    .brand span{display:none}
+    .brand .mark{height:17px}
+    .size{display:none}
+
+    .stage-inner{padding:64px 16px 152px}
+    .drop{width:calc(100vw - 40px);padding:32px 22px}
+    .drop h1{font-size:18px}
+    .drop p{font-size:13.5px}
+
+    /* Full width, and allowed to wrap. max-width alone could not shrink the
+       bar, because its segments are nowrap flex children: they overflowed and
+       the last controls fell off the right edge. */
+    .dock{left:12px;right:12px;width:auto;max-width:none;transform:none;bottom:16px}
+    .bar{flex-wrap:wrap;justify-content:center;row-gap:3px;border-radius:16px}
+    .bar .rule{display:none}
+    .seg{padding:9px 11px;font-size:13px}
+    .zoom{margin:0 2px}
+
+    .pop{left:0;right:0;width:auto;transform:none;max-height:54vh;border-radius:16px}
+    .emoji-grid{grid-template-columns:repeat(7,1fr)}
   }
+
+  @media (max-width:380px){
+    .seg{padding:8px 9px;font-size:12.5px}
+    .zbtn{min-width:28px}
+    .zbtn.wide{min-width:48px}
+  }
+
   @media (prefers-reduced-motion:reduce){*{transition:none !important}}
 </style>
 </head>
@@ -410,6 +436,7 @@
     sizeOut: document.getElementById('sizeOut'),
     live: document.getElementById('live'),
     stage: document.getElementById('stage'),
+    stageInner: document.getElementById('stageInner'),
     zoomIn: document.getElementById('zoomIn'),
     zoomOut: document.getElementById('zoomOut'),
     zoomFit: document.getElementById('zoomFit'),
@@ -1010,8 +1037,14 @@
   // never above 1:1 — blowing a small screenshot up to fill the window would
   // only show its own pixels.
   function fitScale(L) {
-    var availW = el.stage.clientWidth - 80;
-    var availH = el.stage.clientHeight - 172;
+    // Measured, not guessed. The padding that keeps the canvas clear of the
+    // top bar and the dock changes at every breakpoint, and hardcoding one
+    // set of numbers meant the fit was wrong everywhere except one width.
+    var pad = getComputedStyle(el.stageInner);
+    var availW = el.stage.clientWidth -
+                 parseFloat(pad.paddingLeft) - parseFloat(pad.paddingRight);
+    var availH = el.stage.clientHeight -
+                 parseFloat(pad.paddingTop) - parseFloat(pad.paddingBottom);
     if (availW <= 0 || availH <= 0) return 1;
     return Math.min(availW / L.w, availH / L.h, 1);
   }
@@ -1034,7 +1067,11 @@
   el.zoomOut.addEventListener('click', function () { setZoom(view.zoom / 1.25); });
   el.zoomFit.addEventListener('click', function () { setZoom(1); });
 
-  window.addEventListener('resize', function () { if (state.img) applyView(layout()); });
+  ['resize', 'orientationchange'].forEach(function (ev) {
+    window.addEventListener(ev, function () {
+      if (state.img) setTimeout(function () { applyView(layout()); }, 0);
+    });
+  });
 
   // Ctrl or Cmd with the wheel is the zoom gesture people already know, and it
   // is what a trackpad pinch sends.
