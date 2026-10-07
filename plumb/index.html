@@ -1,0 +1,1013 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+
+<title>Plumb — plumb centre does not look centred</title>
+<meta name="description" content="Six shapes a day. Adjust each one until it looks right, then see how far that is from what the maths says.">
+<meta name="theme-color" content="#141a33">
+
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="icon" href="favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+
+<!-- Absolute, because crawlers do not run the script that could work them out. -->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Plumb">
+<meta property="og:title" content="Plumb">
+<meta property="og:description" content="Plumb centre does not look centred. By how much?">
+<meta property="og:url" content="https://eaustine.github.io/plumb/">
+<meta property="og:image" content="https://eaustine.github.io/plumb/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="The word Plumb beside a square and a circle, the circle outlined where it needs to be to look the same size.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Plumb">
+<meta name="twitter:description" content="Plumb centre does not look centred. By how much?">
+
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wdth,wght@12..96,75..100,400..800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ground:#141a33;      /* the one project in the set that judges form, not
+                              colour, so the ground is free to be a colour */
+    --sheet:#1b2242;
+    --shape:#f4f5fa;       /* 15.74:1 */
+    --muted:#9aa0c0;       /*  6.66:1 */
+    --rule:#262e4e;
+    --target:#ff9d4d;      /* only ever drawn after an answer is committed */
+  }
+
+  *{box-sizing:border-box}
+  [hidden]{display:none !important}
+  html,body{height:100%}
+
+  body{
+    margin:0;background:var(--ground);color:var(--shape);
+    font-family:"Bricolage Grotesque",-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;
+    font-variant-numeric:tabular-nums;-webkit-font-smoothing:antialiased;
+    height:100vh;overflow:hidden;
+    display:flex;flex-direction:column;
+  }
+
+  /* A single hairline across the very top, filling as the set is worked
+     through. No row of cells. */
+  .tape{height:2px;background:var(--rule);flex:0 0 auto}
+  .tape span{display:block;height:100%;background:var(--shape);width:0;transition:width .25s ease}
+  @media (prefers-reduced-motion:reduce){.tape span{transition:none}}
+
+  /* ---------- edge chrome ---------- */
+  .top,.foot{flex:0 0 auto;padding:14px 22px}
+  .top{
+    display:flex;align-items:baseline;justify-content:space-between;gap:14px;
+    border-bottom:1px solid var(--rule);
+  }
+  .wordmark{
+    margin:0;font-size:17px;font-weight:700;letter-spacing:-.02em;
+    font-variation-settings:'wdth' 96;
+  }
+  .meta{display:flex;align-items:baseline;gap:16px;font-size:12.5px;color:var(--muted)}
+  .mode{
+    appearance:none;background:none;border:0;padding:0;font:inherit;font-size:12.5px;
+    color:var(--shape);cursor:pointer;text-decoration:underline;
+    text-underline-offset:4px;text-decoration-color:var(--rule);
+  }
+  .mode:hover{text-decoration-color:var(--shape)}
+  .mode:focus-visible{outline:2px solid var(--shape);outline-offset:3px}
+
+  /* ---------- the shape gets the whole middle ---------- */
+  .field{
+    flex:1 1 auto;min-height:0;position:relative;
+    touch-action:none;cursor:ew-resize;user-select:none;
+  }
+  .field.vertical{cursor:ns-resize}
+  .field svg{position:absolute;inset:0;width:100%;height:100%}
+  .field:focus-visible{outline:2px solid var(--shape);outline-offset:-4px}
+
+  /* ---------- the bottom band does the talking ---------- */
+  .foot{border-top:1px solid var(--rule);background:var(--sheet)}
+  .ask{
+    margin:0 0 14px;font-size:clamp(18px,3.4vw,26px);line-height:1.2;
+    letter-spacing:-.02em;font-weight:500;max-width:26ch;
+  }
+  .ask b{font-weight:700}
+  .row{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+  .hint{font-size:12.5px;color:var(--muted)}
+
+  .btn{
+    appearance:none;font:inherit;font-size:15px;font-weight:600;padding:12px 26px;
+    border:0;background:var(--shape);color:var(--ground);cursor:pointer;
+  }
+  .btn:hover{background:#fff}
+  .btn:focus-visible{outline:2px solid var(--shape);outline-offset:3px}
+  .btn.ghost{background:transparent;color:var(--shape);box-shadow:inset 0 0 0 1px var(--rule)}
+  .btn.ghost:hover{box-shadow:inset 0 0 0 1px var(--shape)}
+
+  /* Three numbers in a line, instead of another marker on another axis. */
+  .nums{display:flex;gap:26px;margin:0 0 12px}
+  .nums div{display:grid;gap:1px}
+  .nums .n{font-size:clamp(22px,4.6vw,32px);font-weight:700;letter-spacing:-.03em;line-height:1}
+  .nums .l{font-size:11px;color:var(--muted)}
+  .nums .you .n{color:var(--shape)}
+  .nums .practice .n{color:var(--target)}
+  .nums .maths .n{color:var(--muted)}
+
+  .call{margin:0 0 6px;font-size:clamp(18px,3.4vw,26px);font-weight:700;letter-spacing:-.02em}
+  .call.off{font-weight:500;color:var(--muted)}
+  .because{margin:0 0 16px;font-size:13px;line-height:1.55;color:var(--muted);max-width:52ch}
+
+  .done h2{margin:0 0 6px;font-size:clamp(22px,5vw,34px);font-weight:700;letter-spacing:-.03em}
+  .done p{margin:0 0 16px;font-size:14px;line-height:1.5;color:var(--muted);max-width:46ch}
+
+  /* ---------- the record takes the screen, it is not a modal ---------- */
+  .sheet{
+    position:fixed;inset:0;z-index:20;background:var(--ground);
+    overflow-y:auto;padding:22px;
+  }
+  .sheet-in{max-width:520px;margin:0 auto}
+  .sheet h2{margin:0 0 20px;font-size:28px;font-weight:700;letter-spacing:-.03em}
+  .sheet p{margin:0 0 14px;font-size:14px;line-height:1.6;max-width:46ch}
+  .sheet .close{
+    position:absolute;top:18px;right:18px;appearance:none;font:inherit;font-size:13px;
+    padding:8px 14px;border:0;background:transparent;color:var(--muted);cursor:pointer;
+    text-decoration:underline;text-underline-offset:4px;
+  }
+  .sheet .close:hover{color:var(--shape)}
+
+  .rules{list-style:none;margin:0 0 18px;padding:0}
+  .rules li{
+    display:grid;grid-template-columns:96px 1fr;gap:14px;align-items:baseline;
+    padding:11px 0;border-top:1px solid var(--rule);
+  }
+  .rules li:last-child{border-bottom:1px solid var(--rule)}
+  .rules b{font-size:13px;font-weight:700}
+  .rules p{margin:0;font-size:13px;line-height:1.45;color:var(--muted)}
+
+  .tallies{display:flex;gap:34px;margin:0 0 26px;flex-wrap:wrap}
+  .tallies div{display:grid;gap:2px}
+  .tallies .v{font-size:34px;font-weight:700;letter-spacing:-.03em;line-height:1}
+  .tallies .k{font-size:12px;color:var(--muted)}
+  .label{margin:24px 0 12px;font-size:12px;color:var(--muted)}
+  .note{margin:18px 0 24px;font-size:13px;line-height:1.55;color:var(--muted);max-width:44ch}
+  .empty{margin:0 0 22px;font-size:14px;line-height:1.6;color:var(--muted)}
+
+  .bars{display:grid;gap:7px}
+  .bars .bar{display:grid;grid-template-columns:106px 1fr;gap:12px;align-items:center}
+  .bars .t{font-size:12.5px;color:var(--muted)}
+  .bars .fill{
+    height:22px;min-width:26px;background:var(--rule);
+    display:flex;align-items:center;justify-content:flex-end;padding-right:8px;
+    font-size:12px;font-weight:600;color:var(--muted);
+  }
+  .bars .fill.on{background:var(--shape);color:var(--ground)}
+
+  .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+  @media (max-width:520px){
+    .top,.foot{padding:12px 16px}
+    .nums{gap:18px}
+    .rules li{grid-template-columns:80px 1fr;gap:10px}
+    .tallies{gap:22px}
+  }
+</style>
+</head>
+<body>
+<div class="tape"><span id="tape"></span></div>
+
+<header class="top">
+  <h1 class="wordmark" id="wordmark">Plumb</h1>
+  <div class="meta">
+    <span id="puzzleNo">No. 1</span>
+    <button class="mode" id="statsBtn" type="button">Record</button>
+    <button class="mode" id="helpBtn" type="button">How</button>
+  </div>
+</header>
+
+<div class="field" id="stage" tabindex="0" role="slider"
+     aria-label="Drag to adjust" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+  <svg id="art" viewBox="0 0 440 280" preserveAspectRatio="xMidYMid meet" aria-hidden="true"></svg>
+</div>
+
+<footer class="foot">
+  <div id="asking">
+    <p class="ask" id="task"></p>
+    <div class="row">
+      <span class="hint" id="hint">Drag anywhere</span>
+      <button class="btn" id="commitBtn" type="button">Looks right</button>
+    </div>
+  </div>
+
+  <div id="verdict" hidden>
+    <p class="call" id="call"></p>
+    <div class="nums">
+      <div class="you"><span class="n" id="numYou"></span><span class="l">yours</span></div>
+      <div class="practice"><span class="n" id="numConv"></span><span class="l">practice</span></div>
+      <div class="maths"><span class="n" id="numMaths"></span><span class="l">maths</span></div>
+    </div>
+    <p class="because" id="because"></p>
+    <div class="row">
+      <span class="hint">The warm outline is what practice would do</span>
+      <button class="btn" id="nextBtn" type="button">Next shape</button>
+    </div>
+  </div>
+
+  <div class="done" id="summary" hidden>
+    <h2 id="summaryTitle"></h2>
+    <p id="summaryText"></p>
+    <div class="row">
+      <button class="btn" id="againBtn" type="button">Another six</button>
+      <button class="btn ghost" id="summaryStats" type="button">See your record</button>
+    </div>
+  </div>
+</footer>
+
+<p class="sr" role="status" aria-live="polite" id="live"></p>
+
+<section class="sheet" id="help" hidden aria-labelledby="helpTitle">
+  <button class="close" id="helpX" type="button">Close</button>
+  <div class="sheet-in">
+    <h2 id="helpTitle">How to play</h2>
+    <p>Six shapes. Adjust each one until it looks right, then find out where the
+    maths sits and where practice sits.</p>
+    <p>Those two are rarely the same place. A circle the same height as a square
+    looks smaller. A block centred by coordinates sits low. Everyone has heard
+    this. Almost nobody can say by how much.</p>
+    <ul class="rules">
+      <li><b>Nailed it</b><p>Inside the band that working practice covers.</p></li>
+      <li><b>Close</b><p>Right direction, not quite far enough, or a little past.</p></li>
+      <li><b>Off</b><p>Wide of the band, or adjusted the wrong way entirely.</p></li>
+    </ul>
+    <p>No measurement is shown while you adjust. A number on screen turns this
+    into counting to a target rather than judging by eye.</p>
+    <p>A plumb line finds true by gravity rather than by eye, and plumb centre
+    means exactly centred. The whole game is the gap between that and what
+    looks right.</p>
+    <p>There is no single correct answer to an optical adjustment, which is why
+    the target is a band. Your record tracks something more useful than
+    accuracy: whether you move the right way at all, and whether you stop short.</p>
+    <button class="btn" id="helpClose" type="button">Start</button>
+  </div>
+</section>
+
+<section class="sheet" id="stats" hidden aria-labelledby="statsTitle">
+  <button class="close" id="statsX" type="button">Close</button>
+  <div class="sheet-in">
+    <h2 id="statsTitle">Your record</h2>
+    <p class="empty" id="statsEmpty" hidden>Nothing here yet. Adjust a few shapes and this fills in.</p>
+    <div id="statsBody">
+      <div class="tallies" id="tallies"></div>
+      <h3 class="label">Where you land</h3>
+      <div class="bars" id="lean"></div>
+      <p class="note" id="statsNote"></p>
+    </div>
+    <button class="btn" id="statsClose" type="button">Back to the shapes</button>
+  </div>
+</section>
+
+<script>
+(function () {
+  'use strict';
+
+  var NAME = 'Plumb';
+  var PER_SET = 6;
+  var LAUNCH = Date.UTC(2026, 7, 31);
+  var W = 440, H = 280;              // the SVG coordinate space
+
+  /* ---------- the adjustments ----------
+     Every target below is taken from working practice or derived, not invented.
+     A game that grades an eye has to be able to say where its answer comes
+     from. */
+  var SHAPE = '#f4f5fa', GROUND = '#141a33', RULE = '#262e4e';
+  var TARGET = '#ff9d4d', TARGET_ON_LIGHT = '#d9600f';
+
+  var KINDS = {
+    overshoot: {
+      axis: 'x',
+      task: 'Make the circle look the <b>same size</b> as the square.',
+      unit: '%',
+      maths: 100, convention: 111, band: 3.5,
+      min: 82, max: 138,
+      source: 'A circle of equal height covers about a fifth less area, so it ' +
+              'reads smaller. Material\u2019s keyline grid answers this with an ' +
+              '18px square and a 20px circle in the same 24px frame, which is ' +
+              '11 per cent larger. Matching the square\u2019s area exactly would ' +
+              'give 112.8, so the two agree.'
+    },
+    centre: {
+      axis: 'y',
+      task: 'Move the shape so it looks <b>centred</b> in the frame.',
+      unit: '%',
+      // Measured as the top margin\u2019s share of the free space, which is
+      // what the 45:55 rule actually describes. Measuring the object\u2019s
+      // centre instead drifts from the rule as the object gets taller.
+      maths: 50, convention: 45, band: 2,
+      min: 30, max: 70,
+      source: 'Centred by coordinates, an object reads as sitting low. Poster ' +
+              'and book layout answers this by giving it 45 per cent of the free ' +
+              'space above and 55 below, whatever its size.'
+    },
+    stroke: {
+      axis: 'x',
+      task: 'Make the horizontal look the <b>same weight</b> as the vertical.',
+      unit: '%',
+      maths: 100, convention: 85, band: 4,
+      min: 58, max: 132,
+      source: 'A horizontal stroke reads heavier than a vertical one of the same ' +
+              'measure. Type designers cut horizontals 10 to 20 per cent thinner ' +
+              'to compensate, which is why the crossbar of an H is lighter than ' +
+              'its stems.'
+    },
+    mass: {
+      axis: 'x',
+      task: 'Move the shape so it looks <b>centred</b>.',
+      unit: '%',
+      maths: 0, convention: 16.7, band: 5,     // overridden per shape
+      min: -20, max: 42,
+      source: ''
+    }
+  };
+
+  var OBJ_NAME = { bar: 'bar', circle: 'circle', square: 'square', pill: 'pill', lines: 'text block' };
+  var BOX_NAME = { circle: 'circle', square: 'square', rounded: 'tile' };
+  var MASS_NAME = { triangle: 'triangle', arrowhead: 'arrowhead', pennant: 'pennant', tab: 'tab' };
+  var STROKE_TASK = {
+    pair: 'Make the horizontal bar look the <b>same weight</b> as the vertical one.',
+    plus: 'Make the crossing bar look the <b>same weight</b> as the upright.',
+    tee:  'Make the top of the T look the <b>same weight</b> as its stem.',
+    ell:  'Make the foot of the L look the <b>same weight</b> as its upright.',
+    aitch: 'Make the crossbar of the H look the <b>same weight</b> as its stems.'
+  };
+
+  // Shapes in a unit box, pointing right. All are symmetric top to bottom, so
+  // their centre of mass differs from their bounding box only sideways, which
+  // is the one axis the player drags.
+  var FAMILIES = {
+    triangle:  function ()  { return [[0, 0], [1, .5], [0, 1]]; },
+    arrowhead: function (n) { return [[0, 0], [1, .5], [0, 1], [n, .5]]; },
+    pennant:   function (a) { return [[0, 0], [1, a], [1, 1 - a], [0, 1]]; },
+    tab:       function (p) { return [[0, 0], [p, 0], [1, .5], [p, 1], [0, 1]]; }
+  };
+
+  // The shoelace formula. Exact for any simple polygon, so every shape the
+  // generator produces carries its own derived answer rather than a borrowed one.
+  function centroidX(pts) {
+    var a = 0, cx = 0;
+    for (var i = 0; i < pts.length; i++) {
+      var p = pts[i], q = pts[(i + 1) % pts.length];
+      var cr = p[0] * q[1] - q[0] * p[1];
+      a += cr;
+      cx += (p[0] + q[0]) * cr;
+    }
+    return cx / (3 * a);
+  }
+
+  function massSource(cx, corr) {
+    var side = corr > 0 ? 'left' : 'right';
+    return 'Centring the bounding box leaves this shape looking off to the ' +
+           side + '. Its centre of mass sits ' + Math.round(cx * 100) +
+           ' per cent of the way across rather than halfway, so it has to move ' +
+           Math.abs(corr) + ' per cent of its width to look centred. That ' +
+           'figure is computed for this exact shape, not borrowed from another.';
+  }
+
+  function specOf(item) {
+    var base = KINDS[item.kind], out = {}, key;
+    for (key in base) out[key] = base[key];
+    if (item.over) for (key in item.over) out[key] = item.over[key];
+    return out;
+  }
+
+
+  /* ---------- storage ---------- */
+  var Store = (function () {
+    var KEY = 'plumb:v1';
+    var host = (window.storage && typeof window.storage.get === 'function') ? window.storage : null;
+    if (host) {
+      return {
+        load: function () {
+          return host.get(KEY).then(function (r) {
+            return r && r.value ? JSON.parse(r.value) : null;
+          })['catch'](function () { return null; });
+        },
+        save: function (d) { return host.set(KEY, JSON.stringify(d))['catch'](function () {}); }
+      };
+    }
+    var local = null;
+    try {
+      window.localStorage.setItem('__plumb__', '1');
+      window.localStorage.removeItem('__plumb__');
+      local = window.localStorage;
+    } catch (e) { local = null; }
+    if (local) {
+      return {
+        load: function () {
+          var out = null;
+          try { var raw = local.getItem(KEY); if (raw) out = JSON.parse(raw); } catch (e) { out = null; }
+          return Promise.resolve(out);
+        },
+        save: function (d) {
+          try { local.setItem(KEY, JSON.stringify(d)); } catch (e) {}
+          return Promise.resolve();
+        }
+      };
+    }
+    var mem = null;
+    return {
+      load: function () { return Promise.resolve(mem); },
+      save: function (d) { mem = d; return Promise.resolve(); }
+    };
+  })();
+
+  function mulberry32(a) {
+    return function () {
+      a |= 0; a = a + 0x6D2B79F5 | 0;
+      var t = Math.imul(a ^ a >>> 15, 1 | a);
+      t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+      return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    };
+  }
+
+  function dayIndex() {
+    var n = new Date();
+    return Math.floor((Date.UTC(n.getFullYear(), n.getMonth(), n.getDate()) - LAUNCH) / 86400000);
+  }
+
+  // The sizes vary each day so a set cannot be memorised as pixel positions,
+  // but the target never moves: the adjustment is a ratio, not a distance.
+  function buildSet(day, round) {
+    var rand = mulberry32((day * 2654435761 + round * 40503) % 2147483647);
+    rand(); rand();
+
+    var pick = function (list) { return list[Math.floor(rand() * list.length)]; };
+    var shuffle = function (list) {
+      for (var i = list.length - 1; i > 0; i--) {
+        var j = Math.floor(rand() * (i + 1));
+        var t = list[i]; list[i] = list[j]; list[j] = t;
+      }
+      return list;
+    };
+
+    // Every kind once, plus two more drawn at random, so no kind appears more
+    // than twice in a set and none sits beside itself.
+    var kinds = ['overshoot', 'centre', 'stroke', 'mass'];
+    var order = kinds.concat(shuffle(kinds.slice()).slice(0, 2));
+    for (var tries = 0; tries < 24; tries++) {
+      shuffle(order);
+      var clash = false;
+      for (var n = 1; n < order.length; n++) if (order[n] === order[n - 1]) clash = true;
+      if (!clash) break;
+    }
+
+    var seen = {};
+    return order.map(function (kind) {
+      var item;
+      for (var t = 0; t < 16; t++) {
+        item = makeItem(kind, rand, pick);
+        if (!seen[item.key]) break;
+      }
+      seen[item.key] = true;
+      return item;
+    });
+  }
+
+  function makeItem(kind, rand, pick) {
+    var s = 0.86 + rand() * 0.28;
+
+    if (kind === 'overshoot') {
+      var left = rand() < 0.5, outline = rand() < 0.5;
+      return { kind: kind, scale: s, circleLeft: left, outline: outline,
+               key: 'o' + left + outline };
+    }
+
+    if (kind === 'centre') {
+      var obj = pick(['bar', 'circle', 'square', 'pill', 'lines']);
+      var frame = pick(['landscape', 'square', 'portrait']);
+      return { kind: kind, scale: s, obj: obj, frame: frame, key: 'c' + obj + frame,
+               over: { task: 'Move the ' + OBJ_NAME[obj] + ' so it looks <b>centred</b> in the frame.' } };
+    }
+
+    if (kind === 'stroke') {
+      var form = pick(['pair', 'plus', 'tee', 'ell', 'aitch']);
+      return { kind: kind, scale: s, form: form, key: 's' + form,
+               over: { task: STROKE_TASK[form] } };
+    }
+
+    // Proportions are held where the shift is at least six per cent. Below
+    // that the adjustment is too subtle to teach anything.
+    var fam = pick(['triangle', 'arrowhead', 'pennant', 'tab']);
+    var p = fam === 'arrowhead' ? 0.14 + rand() * 0.16
+          : fam === 'pennant'   ? 0.32 + rand() * 0.12
+          : fam === 'tab'       ? 0.42 + rand() * 0.30
+          : null;
+    var mirror = rand() < 0.5;
+    var box = pick(['circle', 'square', 'rounded']);
+
+    var pts = FAMILIES[fam](p);
+    if (mirror) pts = pts.map(function (q) { return [1 - q[0], q[1]]; });
+
+    var cx = centroidX(pts);
+    var corr = Math.round((0.5 - cx) * 1000) / 10;
+    var mag = Math.abs(corr);
+    // A band of 30 per cent of the correction, never under 2. That keeps the
+    // mathematical answer a miss and a half-correction short of the band,
+    // however large or small this shape's shift happens to be.
+    var band = Math.max(2, Math.round(mag * 3) / 10);
+
+    return {
+      kind: 'mass', scale: s, pts: pts, box: box,
+      key: 'm' + fam + box + mirror + (p === null ? '' : p.toFixed(2)),
+      over: {
+        convention: corr, band: band,
+        min: corr > 0 ? -Math.round(mag * 0.8 + 8) : Math.round(corr * 2 - 8),
+        max: corr > 0 ? Math.round(corr * 2 + 8) : Math.round(mag * 0.8 + 8),
+        task: 'Move the ' + MASS_NAME[fam] + ' so it looks <b>centred</b> in the ' + BOX_NAME[box] + '.',
+        source: massSource(cx, corr)
+      }
+    };
+  }
+
+  /* ---------- drawing ---------- */
+
+  var el = {
+    wordmark: document.getElementById('wordmark'),
+    puzzleNo: document.getElementById('puzzleNo'),
+    tape: document.getElementById('tape'),
+    asking: document.getElementById('asking'),
+    task: document.getElementById('task'),
+    stage: document.getElementById('stage'),
+    art: document.getElementById('art'),
+    hint: document.getElementById('hint'),
+    verdict: document.getElementById('verdict'),
+    call: document.getElementById('call'),
+    because: document.getElementById('because'),
+    numYou: document.getElementById('numYou'),
+    numConv: document.getElementById('numConv'),
+    numMaths: document.getElementById('numMaths'),
+    next: document.getElementById('nextBtn'),
+    commitBtn: document.getElementById('commitBtn'),
+    summary: document.getElementById('summary'),
+    summaryTitle: document.getElementById('summaryTitle'),
+    summaryText: document.getElementById('summaryText'),
+    again: document.getElementById('againBtn'),
+    summaryStats: document.getElementById('summaryStats'),
+    live: document.getElementById('live'),
+    help: document.getElementById('help'),
+    helpBtn: document.getElementById('helpBtn'),
+    helpClose: document.getElementById('helpClose'),
+    helpX: document.getElementById('helpX'),
+    stats: document.getElementById('stats'),
+    statsBtn: document.getElementById('statsBtn'),
+    statsClose: document.getElementById('statsClose'),
+    statsX: document.getElementById('statsX'),
+    statsBody: document.getElementById('statsBody'),
+    statsEmpty: document.getElementById('statsEmpty'),
+    tallies: document.getElementById('tallies'),
+    lean: document.getElementById('lean'),
+    statsNote: document.getElementById('statsNote')
+  };
+
+  var state = {
+    day: 0, round: 1, set: [], at: 0, answers: [], seenHelp: false,
+    value: 0,
+    record: { asked: 0, hit: 0, lean: [0, 0, 0, 0, 0], sets: 0, days: 0, lastDay: -1 }
+  };
+
+  function svg(tag, attrs) {
+    var node = document.createElementNS('http://www.w3.org/2000/svg', tag);
+    for (var k in attrs) node.setAttribute(k, attrs[k]);
+    return node;
+  }
+
+  function render(showTarget) {
+    var item = state.set[state.at], sp = specOf(item);
+    var v = state.value, s = item.scale, cy = H / 2;
+    var goal = showTarget ? sp.convention : null;
+    el.art.innerHTML = '';
+
+    function merge(a, b) {
+      var o = {}, k;
+      for (k in a) o[k] = a[k];
+      for (k in b) o[k] = b[k];
+      return o;
+    }
+    function add(tag, a) { el.art.appendChild(svg(tag, a)); }
+    function solid(tag, a) { add(tag, merge(a, { fill: SHAPE })); }
+    function ghost(tag, a, colour) {
+      add(tag, merge(a, { fill: 'none', stroke: colour || TARGET,
+                          'stroke-width': 2.2, 'stroke-dasharray': '7 5' }));
+    }
+
+    if (item.kind === 'overshoot') {
+      var side = 104 * s, d = side * v / 100;
+      var sqX = item.circleLeft ? W * 0.70 : W * 0.30;
+      var ciX = item.circleLeft ? W * 0.30 : W * 0.70;
+      var paint = item.outline
+        ? { fill: 'none', stroke: SHAPE, 'stroke-width': 4 }
+        : { fill: SHAPE };
+      add('rect', merge({ x: sqX - side / 2, y: cy - side / 2, width: side, height: side }, paint));
+      add('circle', merge({ cx: ciX, cy: cy, r: d / 2 }, paint));
+      if (goal !== null) ghost('circle', { cx: ciX, cy: cy, r: side * goal / 200 });
+
+    } else if (item.kind === 'centre') {
+      var F = { landscape: [262, 168], square: [206, 206], portrait: [168, 232] }[item.frame];
+      var fw = F[0] * s, fh = F[1] * s;
+      var fx = W / 2 - fw / 2, fy = cy - fh / 2;
+      add('rect', { x: fx, y: fy, width: fw, height: fh, fill: 'none', stroke: RULE, 'stroke-width': 1.5 });
+
+      var m = Math.min(fw, fh);
+      var ob = {
+        bar:    { w: fw * 0.62, h: fh * 0.2 },
+        circle: { w: m * 0.36,  h: m * 0.36 },
+        square: { w: m * 0.34,  h: m * 0.34 },
+        pill:   { w: fw * 0.56, h: fh * 0.19 },
+        lines:  { w: fw * 0.62, h: fh * 0.3 }
+      }[item.obj];
+      var ox = W / 2 - ob.w / 2;
+      // The value is the top margin's share of the free space, exactly as
+      // the 45:55 rule is stated.
+      var topAt = function (val) { return fy + (fh - ob.h) * val / 100; };
+
+      var drawObj = function (y, emit) {
+        if (item.obj === 'circle') {
+          emit('circle', { cx: ox + ob.w / 2, cy: y + ob.h / 2, r: ob.w / 2 });
+        } else if (item.obj === 'pill') {
+          emit('rect', { x: ox, y: y, width: ob.w, height: ob.h, rx: ob.h / 2 });
+        } else if (item.obj === 'lines') {
+          var lh = ob.h * 0.22, gap = (ob.h - lh * 3) / 2;
+          emit('rect', { x: ox, y: y, width: ob.w, height: lh });
+          emit('rect', { x: ox, y: y + lh + gap, width: ob.w, height: lh });
+          emit('rect', { x: ox, y: y + (lh + gap) * 2, width: ob.w * 0.64, height: lh });
+        } else {
+          emit('rect', { x: ox, y: y, width: ob.w, height: ob.h });
+        }
+      };
+      drawObj(topAt(v), solid);
+      if (goal !== null) drawObj(topAt(goal), function (t, a) { ghost(t, a); });
+
+    } else if (item.kind === 'stroke') {
+      var t = 20 * s, L = 150 * s;
+      var hb = function (val) { return t * val / 100; };
+      var form = item.form;
+      var cross = function (val, emit) {
+        var h = hb(val);
+        if (form === 'pair')       emit('rect', { x: W * 0.44, y: cy - h / 2, width: L, height: h });
+        else if (form === 'plus')  emit('rect', { x: W / 2 - L / 2, y: cy - h / 2, width: L, height: h });
+        else if (form === 'tee')   emit('rect', { x: W / 2 - L / 2, y: cy - L / 2, width: L, height: h });
+        else if (form === 'ell')   emit('rect', { x: W / 2 - L / 2, y: cy + L / 2 - h, width: L, height: h });
+        else                       emit('rect', { x: W / 2 - L * 0.42, y: cy - h / 2, width: L * 0.84, height: h });
+      };
+
+      if (form === 'pair') {
+        solid('rect', { x: W * 0.30 - t / 2, y: cy - L / 2, width: t, height: L });
+      } else if (form === 'plus' || form === 'tee') {
+        solid('rect', { x: W / 2 - t / 2, y: cy - L / 2, width: t, height: L });
+      } else if (form === 'ell') {
+        solid('rect', { x: W / 2 - L / 2, y: cy - L / 2, width: t, height: L });
+      } else {
+        solid('rect', { x: W / 2 - L * 0.42 - t / 2, y: cy - L / 2, width: t, height: L });
+        solid('rect', { x: W / 2 + L * 0.42 - t / 2, y: cy - L / 2, width: t, height: L });
+      }
+      cross(v, solid);
+      if (goal !== null) cross(goal, function (tag, a) { ghost(tag, a); });
+
+    } else {
+      var C = 190 * s, tw = C * 0.46, th = C * 0.52;
+      if (item.box === 'circle') {
+        solid('circle', { cx: W / 2, cy: cy, r: C / 2 });
+      } else {
+        solid('rect', { x: W / 2 - C / 2, y: cy - C / 2, width: C, height: C,
+                        rx: item.box === 'rounded' ? C * 0.22 : 0 });
+      }
+      var pathAt = function (val) {
+        var left = W / 2 - tw / 2 + tw * val / 100;
+        return 'M' + item.pts.map(function (q) {
+          return (left + q[0] * tw) + ' ' + (cy - th / 2 + q[1] * th);
+        }).join(' L') + ' Z';
+      };
+      add('path', { d: pathAt(v), fill: GROUND });
+      // The shape sits on a light container, where the usual warm outline is
+      // too pale to read, so a deeper warm carries the same meaning.
+      if (goal !== null) ghost('path', { d: pathAt(goal) }, TARGET_ON_LIGHT);
+    }
+
+    el.stage.setAttribute('aria-valuenow', state.value.toFixed(1));
+  }
+
+  function paintProgress() {
+    el.tape.style.width = (state.answers.length / PER_SET * 100) + '%';
+  }
+
+  function showShape() {
+    var item = state.set[state.at];
+    var k = specOf(item);
+    state.value = k.maths;
+
+    el.task.innerHTML = k.task;
+    el.puzzleNo.textContent = 'No. ' + (state.day + 1) + ' \u00b7 ' +
+                              (state.at + 1) + '/' + PER_SET;
+    el.stage.classList.toggle('vertical', k.axis === 'y');
+    el.hint.textContent = k.axis === 'y' ? 'Drag up or down' : 'Drag left or right';
+    el.stage.setAttribute('aria-valuemin', k.min);
+    el.stage.setAttribute('aria-valuemax', k.max);
+
+    el.verdict.hidden = true;
+    el.summary.hidden = true;
+    el.asking.hidden = false;
+    el.stage.hidden = false;
+    paintProgress();
+    render();
+  }
+
+  /* ---------- adjusting ---------- */
+
+  function clampValue(v) {
+    var k = specOf(state.set[state.at]);
+    return Math.max(k.min, Math.min(k.max, v));
+  }
+
+  var drag = null;
+
+  function unitScale() {
+    var r = el.art.getBoundingClientRect();
+    return r.width ? W / r.width : 1;
+  }
+
+  el.stage.addEventListener('pointerdown', function (ev) {
+    if (!el.verdict.hidden) return;
+    var k = specOf(state.set[state.at]);
+    drag = { x: ev.clientX, y: ev.clientY, from: state.value, k: k };
+    el.stage.setPointerCapture(ev.pointerId);
+    ev.preventDefault();
+  });
+
+  el.stage.addEventListener('pointermove', function (ev) {
+    if (!drag) return;
+    var u = unitScale();
+    // The full range is a 240 unit drag, so every adjustment feels the same
+    // however wide its range happens to be.
+    var span = (drag.k.max - drag.k.min) / 240;
+    var delta = drag.k.axis === 'y'
+      ? (ev.clientY - drag.y) * u * span
+      : (ev.clientX - drag.x) * u * span;
+    state.value = clampValue(drag.from + delta);
+    render();
+  });
+
+  ['pointerup', 'pointercancel'].forEach(function (n) {
+    el.stage.addEventListener(n, function () { drag = null; });
+  });
+
+  el.stage.addEventListener('keydown', function (ev) {
+    if (!el.verdict.hidden) return;
+    var k = specOf(state.set[state.at]);
+    var step = ev.shiftKey ? 0.2 : 1;
+    var map = { ArrowLeft: -step, ArrowDown: -step, ArrowRight: step, ArrowUp: step };
+    if (!(ev.key in map)) return;
+    ev.preventDefault();
+    // Down and up read naturally when the thing being moved is vertical.
+    var dir = (k.axis === 'y' && (ev.key === 'ArrowUp' || ev.key === 'ArrowDown')) ? -1 : 1;
+    state.value = clampValue(state.value + map[ev.key] * dir);
+    render();
+  });
+
+  /* ---------- grading ---------- */
+
+  function grade(item, v) {
+    var k = specOf(item);
+    var off = Math.abs(v - k.convention);
+    if (off <= k.band) return 'hit';
+    if (off <= k.band * 2.4) return 'near';
+    return 'miss';
+  }
+
+  // Five buckets, from badly the wrong way to badly too far. The middle is the
+  // band itself. This is the number worth knowing: most people undercorrect.
+  function leanBucket(item, v) {
+    var k = specOf(item);
+    var toward = k.convention - k.maths;
+    var moved = v - k.maths;
+    var off = v - k.convention;
+    if (Math.abs(off) <= k.band) return 2;
+    if (moved * toward <= 0) return 0;
+    return off * toward < 0 ? 1 : 3;
+  }
+
+  function answer() {
+    var item = state.set[state.at];
+    var k = specOf(item);
+    var v = state.value;
+    var g = grade(item, v);
+    var bucket = leanBucket(item, v);
+
+    state.answers.push({ kind: item.kind, value: v, grade: g, bucket: bucket });
+    state.record.asked += 1;
+    if (g === 'hit') state.record.hit += 1;
+    state.record.lean[bucket] += 1;
+
+    el.call.className = 'call' + (g === 'hit' ? '' : ' off');
+    el.call.textContent = g === 'hit' ? 'Inside the band.'
+      : (bucket === 0 ? 'Wrong way.' : (bucket === 1 ? 'Right way, not far enough.' : 'Past it.'));
+
+    el.because.textContent = k.source;
+
+    var show = function (x) {
+      return (x > 0 && k.maths === 0 ? '+' : '') + (Math.round(x * 10) / 10) + k.unit;
+    };
+    el.numYou.textContent = show(v);
+    el.numConv.textContent = show(k.convention);
+    el.numMaths.textContent = show(k.maths);
+
+    el.live.textContent = el.call.textContent + ' ' + k.source;
+    el.next.textContent = state.at + 1 === PER_SET ? 'See the set' : 'Next shape';
+    el.asking.hidden = true;
+    el.verdict.hidden = false;
+    render(true);
+    paintProgress();
+    el.next.focus();
+    persist();
+  }
+
+  function finishSet() {
+    var hits = state.answers.filter(function (a) { return a.grade === 'hit'; }).length;
+    var wrongWay = state.answers.filter(function (a) { return a.bucket === 0; }).length;
+    state.record.sets += 1;
+
+    el.stage.hidden = true;
+    el.asking.hidden = true;
+    el.verdict.hidden = true;
+    el.summary.hidden = false;
+    el.tape.style.width = '100%';
+
+    el.summaryTitle.textContent = hits + ' of ' + PER_SET + ' inside the band';
+    el.summaryText.textContent = wrongWay > 2
+      ? 'More than half went the wrong way, which is the interesting result: the maths feels right until it is measured.'
+      : (hits >= 5 ? 'A good eye, or a good memory. Both count.'
+                   : 'Worth another six. Undercorrecting is the usual pattern.');
+    persist();
+  }
+
+  function next() {
+    if (state.at + 1 >= PER_SET) { finishSet(); return; }
+    state.at += 1;
+    showShape();
+    persist();
+  }
+
+  function startRound() {
+    state.set = buildSet(state.day, state.round);
+    state.at = 0;
+    state.answers = [];
+    el.summary.hidden = true;
+    showShape();
+  }
+
+  /* ---------- record ---------- */
+
+  var LEAN_LABEL = ['Wrong way', 'Stopped short', 'Inside the band', 'Went past', 'Far past'];
+
+  function renderStats() {
+    var r = state.record;
+    el.statsEmpty.hidden = r.asked > 0;
+    el.statsBody.hidden = r.asked === 0;
+    if (!r.asked) return;
+
+    var pct = Math.round(r.hit / r.asked * 100);
+    el.tallies.innerHTML = '';
+    [['Shapes', r.asked], ['Inside', r.hit], ['Rate', pct + '%']].forEach(function (pair) {
+      var box = document.createElement('div');
+      var v = document.createElement('span'); v.className = 'v'; v.textContent = pair[1];
+      var k = document.createElement('span'); k.className = 'k'; k.textContent = pair[0];
+      box.appendChild(v); box.appendChild(k);
+      el.tallies.appendChild(box);
+    });
+
+    var peak = Math.max.apply(null, r.lean.concat([1]));
+    el.lean.innerHTML = '';
+    r.lean.forEach(function (count, i) {
+      var row = document.createElement('div'); row.className = 'bar';
+      var t = document.createElement('span'); t.className = 't'; t.textContent = LEAN_LABEL[i];
+      var fill = document.createElement('span');
+      fill.className = 'fill' + (count ? ' on' : '');
+      fill.style.width = Math.round(count / peak * 100) + '%';
+      fill.textContent = count;
+      row.appendChild(t); row.appendChild(fill);
+      el.lean.appendChild(row);
+    });
+
+    var short = r.lean[1], past = r.lean[3] + r.lean[4], wrong = r.lean[0];
+    var missed = short + past + wrong;
+    var notes = [];
+    if (missed >= 5) {
+      if (wrong >= missed * 0.5) {
+        notes.push('Half your misses move away from the answer, which means the ' +
+                   'maths still looks right to you.');
+      } else if (short >= past * 2) {
+        notes.push('You stop short far more often than you overshoot. Almost ' +
+                   'everyone does: the correction feels wrong before it looks right.');
+      } else if (past >= short * 2) {
+        notes.push('You push past the band more often than you stop short, which ' +
+                   'is the rarer habit.');
+      } else {
+        notes.push('Your misses fall fairly evenly short and past.');
+      }
+    }
+    if (r.sets) notes.push('Sets finished: ' + r.sets + '.');
+    if (r.days > 1) notes.push('Played on ' + r.days + ' days.');
+    el.statsNote.textContent = notes.join(' ');
+  }
+
+  /* ---------- dialogs ---------- */
+
+  // Full-screen takeovers rather than dialogs. A modal floating over a dimmed
+  // page is the shape the other two use.
+  function openHelp() { el.help.hidden = false; }
+  function closeHelp() {
+    el.help.hidden = true;
+    if (!state.seenHelp) { state.seenHelp = true; persist(); }
+  }
+  function openStats() { renderStats(); el.stats.hidden = false; }
+  function closeStats() { el.stats.hidden = true; }
+
+  /* ---------- state ---------- */
+
+  function persist() {
+    Store.save({
+      v: 1, day: state.day, round: state.round, at: state.at,
+      answers: state.answers, seenHelp: state.seenHelp, record: state.record
+    });
+  }
+
+  function startDay(saved) {
+    state.day = dayIndex();
+    state.seenHelp = !!(saved && saved.seenHelp);
+    el.puzzleNo.textContent = 'No. ' + (state.day + 1);
+    el.wordmark.textContent = NAME;
+
+    if (saved && saved.record) {
+      var r = saved.record;
+      state.record = {
+        asked: r.asked || 0,
+        hit: r.hit || 0,
+        lean: (r.lean && r.lean.length === 5) ? r.lean.slice() : [0, 0, 0, 0, 0],
+        sets: r.sets || 0,
+        days: r.days || 0,
+        lastDay: typeof r.lastDay === 'number' ? r.lastDay : -1
+      };
+    }
+    if (state.record.lastDay !== state.day) {
+      state.record.days += 1;
+      state.record.lastDay = state.day;
+    }
+
+    var sameDay = saved && saved.day === state.day;
+    state.round = sameDay ? (saved.round || 1) : 1;
+    startRound();
+
+    if (sameDay && saved.answers && saved.answers.length) {
+      state.answers = saved.answers.slice(0, PER_SET);
+      if (state.answers.length >= PER_SET) {
+        paintProgress();
+        finishSet();
+      } else {
+        state.at = state.answers.length;
+        showShape();
+      }
+    }
+    persist();
+  }
+
+  el.commitBtn.addEventListener('click', answer);
+  el.next.addEventListener('click', next);
+  el.again.addEventListener('click', function () {
+    state.round += 1;
+    startRound();
+    persist();
+  });
+  el.summaryStats.addEventListener('click', openStats);
+
+  el.helpBtn.addEventListener('click', openHelp);
+  el.helpClose.addEventListener('click', closeHelp);
+  el.helpX.addEventListener('click', closeHelp);
+  el.statsBtn.addEventListener('click', openStats);
+  el.statsClose.addEventListener('click', closeStats);
+  el.statsX.addEventListener('click', closeStats);
+
+  document.addEventListener('keydown', function (e) {
+    if (!el.help.hidden || !el.stats.hidden) {
+      if (e.key === 'Escape') { closeHelp(); closeStats(); }
+      return;
+    }
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    if (!el.verdict.hidden) next();
+    else if (!el.asking.hidden) answer();
+  });
+
+  Store.load().then(function (saved) {
+    startDay(saved);
+    if (!state.seenHelp) openHelp();
+  });
+})();
+</script>
+</body>
+</html>
