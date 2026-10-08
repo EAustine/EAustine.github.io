@@ -1,0 +1,158 @@
+/* Coast run. Every value comes from tokens.css unless the handoff pins a number. */
+
+:root {
+  /* HUD inset from each screen edge: 16px, or clear of a notch or home bar */
+  --e-t: max(16px, calc(env(safe-area-inset-top, 0px) + 8px));
+  --e-r: max(16px, calc(env(safe-area-inset-right, 0px) + 8px));
+  --e-b: max(16px, calc(env(safe-area-inset-bottom, 0px) + 8px));
+  --e-l: max(16px, calc(env(safe-area-inset-left, 0px) + 8px));
+  --row-2: calc(var(--e-t) + 62px);          /* strip layout: second HUD row */
+  --tb: clamp(60px, 19vw, 76px);             /* touch button size */
+}
+
+html, body { margin: 0; height: 100%; overflow: hidden; background: var(--cr-night); overscroll-behavior: none; }
+canvas#scene { position: fixed; inset: 0; display: block; width: 100%; height: 100%; touch-action: none; }
+
+/* ---------------- HUD ---------------- */
+.hud { position: fixed; inset: 0; pointer-events: none; font-family: var(--font-sans); }
+.card {
+  background: rgba(255,255,255,0.92); border: 1px solid var(--border-1); border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md); padding: var(--space-4) var(--space-5);
+}
+.label { font-size: var(--fs-micro); letter-spacing: var(--tracking-wide); text-transform: uppercase;
+         color: var(--fg-3); font-weight: var(--fw-medium); }
+.num { font-variant-numeric: tabular-nums; color: var(--fg-1); font-weight: var(--fw-semibold); }
+
+#gaugeCard { position: absolute; right: var(--e-r); bottom: var(--e-b); padding: var(--space-3); }
+#gauge { display: block; width: 168px; height: 168px; }
+#stats { position: absolute; top: var(--e-t); right: var(--e-r); display: grid; grid-template-columns: auto auto; gap: 6px 24px; }
+#stats .num { font-size: 20px; text-align: right; }
+#strikes { position: absolute; top: var(--e-t); left: 50%; transform: translateX(-50%);
+           display: flex; gap: 8px; align-items: center; }
+#strikes .dot { width: 12px; height: 12px; border-radius: var(--radius-full);
+                background: var(--cr-surf); transition: background var(--dur-med) var(--ease-standard); }
+#strikes .dot.lost { background: var(--cr-ink-200); }
+#mapCard { position: absolute; left: var(--e-l); bottom: calc(var(--e-b) + 36px); padding: var(--space-3); }
+#map { display: block; width: 132px; height: 190px; border-radius: var(--radius-sm); }
+#toast { position: absolute; left: 50%; top: 96px; transform: translateX(-50%); white-space: nowrap;
+         font-size: var(--fs-h4); font-weight: var(--fw-semibold); color: var(--cr-surf);
+         opacity: 0; transition: opacity var(--dur-med) var(--ease-standard); text-shadow: 0 1px 2px rgba(255,255,255,0.8); }
+#toast.show { opacity: 1; }
+
+/* ---------------- overlays ---------------- */
+.overlay {
+  position: fixed; inset: 0; display: grid; place-items: center; z-index: 10;
+  background: rgba(14,27,48,0.62); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
+  font-family: var(--font-sans);
+}
+.overlay[hidden] { display: none; }
+.panel { background: var(--bg-1); border-radius: var(--radius-xl); box-shadow: var(--shadow-xl);
+         padding: var(--space-8); width: min(560px, calc(100vw - 32px)); box-sizing: border-box;
+         max-height: calc(100% - 32px); overflow-y: auto; }
+.panel h1.wordmark { margin: 0 0 var(--space-4); line-height: 0; }
+.panel h1.wordmark img { height: 30px; width: auto; display: block; }
+.panel h1 { font-size: var(--fs-h1); letter-spacing: var(--tracking-tight); margin: 0 0 var(--space-2); color: var(--fg-1); }
+.panel p { margin: 0 0 var(--space-6); color: var(--fg-2); font-size: var(--fs-body); }
+.swatches { display: flex; gap: var(--space-3); margin-bottom: var(--space-6); }
+.sw { width: 44px; height: 44px; border-radius: var(--radius-md); border: 2px solid transparent; padding: 0;
+      box-shadow: var(--shadow-xs); cursor: pointer; transition: transform var(--dur-fast) var(--ease-standard); }
+.sw:hover { transform: translateY(-2px); }
+.sw[aria-pressed="true"] { border-color: var(--cr-surf); box-shadow: var(--shadow-focus); }
+.btn { font: var(--fw-semibold) var(--fs-body)/1 var(--font-sans); background: var(--cr-surf);
+       color: var(--fg-on-accent); border: 0; border-radius: var(--radius-md); padding: 14px 20px; cursor: pointer;
+       transition: background var(--dur-fast) var(--ease-standard); }
+.btn:hover { background: var(--cr-surf-700); }
+.btn[disabled] { background: var(--cr-ink-300); cursor: default; }
+.keys { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; margin-top: var(--space-6);
+        font-size: var(--fs-body-sm); color: var(--fg-3); align-items: center; }
+kbd { font-family: var(--font-mono); font-size: 12px; background: var(--bg-3); border: 1px solid var(--border-1);
+      border-radius: var(--radius-xs); padding: 3px 7px; color: var(--fg-2); }
+.finalRow { display: flex; gap: var(--space-8); margin-bottom: var(--space-6); }
+.finalRow .num { font-size: 32px; }
+a.back { position: fixed; left: var(--e-l); bottom: var(--e-b); z-index: 6; font-size: var(--fs-body-sm);
+         color: var(--fg-2); text-decoration: none; font-family: var(--font-sans);
+         background: rgba(255,255,255,0.92); border: 1px solid var(--border-1);
+         border-radius: var(--radius-md); box-shadow: var(--shadow-sm); padding: 8px 12px; }
+a.back:hover { color: var(--fg-1); background: var(--cr-sky-50); }
+
+.sw:focus-visible, .btn:focus-visible, a.back:focus-visible, .back-inline:focus-visible, #soundBtn:focus-visible {
+  outline: 2px solid var(--cr-surf); outline-offset: 2px;
+}
+
+/* ---------------- legend follows the last input used ---------------- */
+.for-touch, .for-pad { display: none; }
+body[data-input="touch"] .for-keys, body[data-input="pad"] .for-keys { display: none; }
+body[data-input="touch"] .for-touch, body[data-input="pad"] .for-pad { display: inline; }
+
+/* ---------------- strip HUD: small windows, and all touch play ---------------- */
+body[data-layout="strip"] #stats {
+  right: auto; left: var(--e-l);
+  grid-template-columns: none; grid-template-rows: auto auto; grid-auto-flow: column;
+  gap: 0 14px; padding: 8px 12px;
+}
+body[data-layout="strip"] #stats .num { font-size: 15px; line-height: 1.3; text-align: left; }
+body[data-layout="strip"] #stats .best { display: none; }   /* Best still shows on both overlays */
+body[data-layout="strip"] #strikes { left: auto; right: var(--e-r); transform: none; height: 40px; box-sizing: border-box; padding: 0 12px; gap: 6px; }
+body[data-layout="strip"] #strikes .label { display: none; }
+
+/* ---------------- touch: thumbs own the bottom corners, so the dials move up ---------------- */
+#soundBtn { display: none; position: absolute; top: var(--e-t); right: var(--e-r); width: 40px; height: 40px;
+            padding: 0; place-items: center; color: var(--fg-1); pointer-events: auto; cursor: pointer;
+            -webkit-tap-highlight-color: transparent; }
+#soundBtn .off { display: none; }
+#soundBtn[aria-pressed="true"] { color: var(--fg-3); }
+#soundBtn[aria-pressed="true"] .on { display: none; }
+#soundBtn[aria-pressed="true"] .off { display: inline; }
+body[data-input="touch"] #soundBtn { display: grid; }
+body[data-input="touch"] #strikes { right: calc(var(--e-r) + 48px); }
+body[data-input="touch"] #mapCard { bottom: auto; top: var(--row-2); }
+body[data-input="touch"] #gaugeCard { bottom: auto; top: var(--row-2); }
+body[data-input="touch"] a.back { display: none; }
+
+.touch { display: none; position: fixed; inset: 0; z-index: 5; pointer-events: none; font-family: var(--font-sans); }
+body[data-input="touch"] .touch { display: block; }
+.zone { position: absolute; bottom: var(--e-b); display: flex; gap: 12px; align-items: flex-end;
+        padding: 12px; margin: -12px;            /* a little slack around the buttons */
+        pointer-events: auto; touch-action: none; user-select: none; -webkit-user-select: none;
+        -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
+.zone.left { left: var(--e-l); }
+.zone.right { right: var(--e-r); }
+.tbtn { width: var(--tb); height: var(--tb); display: grid; place-items: center; pointer-events: none;
+        background: rgba(255,255,255,0.92); border: 1px solid var(--border-1); border-radius: var(--radius-lg);
+        box-shadow: var(--shadow-md); color: var(--fg-1);
+        font-size: var(--fs-body-sm); font-weight: var(--fw-semibold);
+        transition: background var(--dur-fast) var(--ease-standard), transform var(--dur-fast) var(--ease-standard); }
+.tbtn.is-down { background: var(--cr-sky-100); border-color: var(--cr-surf); transform: translateY(2px); }
+.tbtn.gas { height: calc(var(--tb) * 1.4); background: var(--cr-surf); border-color: transparent; color: var(--fg-on-accent); }
+.tbtn.gas.is-down { background: var(--cr-surf-800); }
+
+/* the model viewer link moves into the panels on touch, where the corner link is hidden */
+.back-inline { display: none; margin-top: var(--space-5); font-size: var(--fs-body-sm); color: var(--fg-2);
+               text-decoration: underline; text-underline-offset: 2px; }
+body[data-input="touch"] .back-inline { display: inline-block; }
+body.single a.back, body.single .back-inline { display: none; }
+
+/* ---------------- small viewports: smaller dials and a tighter panel ---------------- */
+@media (max-width: 760px), (max-height: 560px) {
+  #gaugeCard { padding: 6px; }
+  #gauge { width: 112px; height: 112px; }
+  #mapCard { padding: var(--space-2); }
+  #map { width: 92px; height: 132px; }
+  .panel { padding: var(--space-6); }
+  .panel h1 { font-size: var(--fs-h2); }
+  .panel h1.wordmark img { height: 24px; }
+  .panel p { margin-bottom: var(--space-5); }
+  .swatches { margin-bottom: var(--space-5); }
+  .keys { margin-top: var(--space-5); }
+  .finalRow { gap: var(--space-6); }
+  .finalRow .num { font-size: 24px; }
+}
+/* portrait phones: the dials fill the row, so the toast drops below them */
+@media (max-width: 520px) {
+  body[data-input="touch"] #toast { top: calc(var(--row-2) + 162px); font-size: var(--fs-body-lg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #toast, .sw, .btn, .tbtn, #strikes .dot { transition: none; }
+  .sw:hover { transform: none; }
+}
