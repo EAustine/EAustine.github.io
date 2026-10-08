@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://eaustine.github.io/marlowe-oxford/sitemap.xml

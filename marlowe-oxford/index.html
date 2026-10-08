@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+
+<title>Marlowe — The Ashwell Oxford</title>
+<meta name="description" content="A made-to-order oxford configured in 3D in the browser. Choose the leather, toe cap, sole, laces and eyelets, and watch the shoe change as you go.">
+<meta name="author" content="Austine Eluro">
+<meta name="theme-color" content="#14181A">
+<meta name="color-scheme" content="light">
+
+<link rel="canonical" href="https://eaustine.github.io/marlowe-oxford/">
+
+<link rel="icon" href="assets/brand/favicon.ico" sizes="any">
+<link rel="icon" href="assets/brand/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="assets/brand/apple-touch-icon.png">
+<link rel="manifest" href="site.webmanifest">
+
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Marlowe">
+<meta property="og:title" content="Marlowe — The Ashwell Oxford">
+<meta property="og:description" content="A made-to-order oxford configured in 3D in the browser.">
+<meta property="og:url" content="https://eaustine.github.io/marlowe-oxford/">
+<meta property="og:image" content="https://eaustine.github.io/marlowe-oxford/assets/brand/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="The Marlowe wordmark beside the outline of a shoe sole.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Marlowe — The Ashwell Oxford">
+<meta name="twitter:description" content="A made-to-order oxford configured in 3D in the browser.">
+<meta name="twitter:image" content="https://eaustine.github.io/marlowe-oxford/assets/brand/og-image.png">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600&family=Inter+Tight:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="css/marlowe.css">
+
+<link rel="preload" href="assets/model/marlowe-oxford.glb" as="fetch" type="model/gltf-binary" crossorigin>
+</head>
+
+<body>
+<main id="mw">
+  <canvas id="cv" aria-label="Three-dimensional view of the shoe. Drag to turn it." role="img"></canvas>
+
+  <div id="veil" role="status">
+    <p class="veil-t">Preparing the leathers</p>
+    <p class="veil-s" id="veilSub">Reading the last</p>
+  </div>
+
+  <header id="top">
+    <a class="wm" href="./">Marlowe</a>
+    <p class="mdl">The Ashwell Oxford</p>
+  </header>
+
+  <nav id="views" aria-label="Camera angle">
+    <button type="button" data-v="profile" class="on">Profile</button>
+    <button type="button" data-v="angle">Angle</button>
+    <button type="button" data-v="top">Top</button>
+    <button type="button" data-v="heel">Heel</button>
+  </nav>
+
+  <nav id="parts" aria-label="Choose a part of the shoe to configure"></nav>
+
+  <aside id="sheet" aria-label="Options">
+    <div id="sheetBody"></div>
+    <footer id="pay">
+      <div class="totline">
+        <span>Your build</span>
+        <b id="tot">£0</b>
+      </div>
+      <button type="button" id="order">Place order</button>
+      <button type="button" id="share">Copy link to this build</button>
+      <p id="lead">Cut and lasted in Northampton. Ready in 8 weeks.</p>
+    </footer>
+  </aside>
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="js/glb-loader.js"></script>
+<script src="js/catalogue.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
