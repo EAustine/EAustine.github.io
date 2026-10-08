@@ -1,0 +1,28 @@
+{
+  "name": "Orange Jelly",
+  "short_name": "Orange Jelly",
+  "description": "A soft-body orange slice you can stretch, cut, and switch from jelly to real fruit.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#E2DFDA",
+  "theme_color": "#E2DFDA",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
