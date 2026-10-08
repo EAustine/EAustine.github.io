@@ -1,8 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-<title>Coast run</title>
-<clipPath id="c"><rect width="64" height="64" rx="14"/></clipPath>
-<g clip-path="url(#c)">
-<rect width="64" height="64" fill="#2C3242"/>
-<path fill="#E8A03C" d="M14 64 L27 64 L30.4 12 L28 12 Z M37 64 L50 64 L36 12 L33.6 12 Z"/>
-</g>
-</svg>
